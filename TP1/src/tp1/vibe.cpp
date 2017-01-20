@@ -12,7 +12,7 @@ struct ViBe_impl : ViBe {
     const size_t m_nSigma; //< internal ViBe parameter; model update rate
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
-    std::vector<std::vector<cv::Vec3b>> background;
+    std::vector<std::vector<cv::Vec3b>> background; //background model
 
 };
 
@@ -33,25 +33,25 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     // ... @@@@@ TODO
 
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
-
-
+    //loop over the initial frame (except the outer border)
     for(int i = 1; i < oInitFrame.rows-1; i++)
     {
         for(int j = 1; j < oInitFrame.cols-1; ++j)
         {
-            std::vector<cv::Vec3b> tmp;
-            cv::Vec3b values[] = {oInitFrame.at<cv::Vec3b>(i-1,j-1), oInitFrame.at<cv::Vec3b>(i-1,j), oInitFrame.at<cv::Vec3b>(i-1,j+1), oInitFrame.at<cv::Vec3b>(i,j-1),
+            std::vector<cv::Vec3b> tmp; //contain samples for 1 pixel
+            //neighbours pixels
+            cv::Vec3b neighbours[] = {oInitFrame.at<cv::Vec3b>(i-1,j-1), oInitFrame.at<cv::Vec3b>(i-1,j), oInitFrame.at<cv::Vec3b>(i-1,j+1), oInitFrame.at<cv::Vec3b>(i,j-1),
                                   oInitFrame.at<cv::Vec3b>(i,j+1), oInitFrame.at<cv::Vec3b>(i+1,j-1), oInitFrame.at<cv::Vec3b>(i+1,j), oInitFrame.at<cv::Vec3b>(i+1,j+1)};
-            int ran;
+            //loop to put 20 random neighbours in the tmp vector
             for(int k = 0; k < 20; ++k)
-            {
-                ran = rand() % 8;
-                tmp.push_back(values[ran]);
-            }
+                tmp.push_back(neighbours[neighbours]);
+            //add the sample vector to the background model
             background.push_back(tmp);
         }
     }
 }
+
+//function which checks wether two pixel are close
 bool isInSphere(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
     return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= seuil);
 }
@@ -62,17 +62,21 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
 
     // ... @@@@@ TODO
     int coo = 0;
+    //loop over the current frame
     for(int i = 1; i < oCurrFrame.rows-1; i++)
     {
         for(int j = 1; j < oCurrFrame.cols-1; ++j)
         {
-            int nbOk = 0, counter = 0;
-            coo = (i-1)*(oCurrFrame.cols-2)+j-1;
+            int nbOk = 0;   //number of samples pixels which are close to the current pixel
+            int counter = 0;
+            coo = (i-1)*(oCurrFrame.cols-2)+j-1;    //compute coordinate (i,j) for the vector background model (1 dimension)
+            //loop to check if a pixel is background or foreground
             while (nbOk < 2 && counter < 20){
                 if(isInSphere(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j), 20)){
                     nbOk++;
                 }
             }
+            //pixel is background
             if(nbOk == 2)
             {
                 oOutputMask.at<uchar>(i,j) = 0;
@@ -110,7 +114,9 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
                 }
 
 
-            } else {
+            }
+            //pixel is foreground
+            else {
                 oOutputMask.at<uchar>(i,j) = 255;
             }
         }
