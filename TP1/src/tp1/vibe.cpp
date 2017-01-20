@@ -86,29 +86,27 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
                 if(i != 1 && i != oCurrFrame.rows -2 && j != 1 && j != oCurrFrame.cols -2)
                 {
                     ran = rand() % 16;
-                    if(!ran)
-                        background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
-                    ran = rand() % 16;
-                    if(!ran)
-                        background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                    if(!ran){
+                        int neighbours = rand() % 8;
+                        if(neighbours == 0)
+                            background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                        else if (neighbours == 1)
+                            background.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
+                        else if (neighbours == 2)
+                            background.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                        else if (neighbours == 3)
+                            background.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                        else if (neighbours == 4)
+                            background.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                        else if (neighbours == 5)
+                            background.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                        else if (neighbours == 6)
+                            background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
+                        else if (neighbours == 7)
+                            background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+
+
+                    }
                 }
 
 
