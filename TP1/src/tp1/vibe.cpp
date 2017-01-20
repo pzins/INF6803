@@ -30,10 +30,9 @@ ViBe_impl::ViBe_impl(size_t N, size_t R, size_t nMin, size_t nSigma) :
 void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     CV_Assert(!oInitFrame.empty() && oInitFrame.isContinuous() && oInitFrame.type()==CV_8UC3);
 
-    // ... @@@@@ TODO
-
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
     //loop over the initial frame (except the outer border)
+    background.clear();
     for(int i = 1; i < oInitFrame.rows-1; i++)
     {
         for(int j = 1; j < oInitFrame.cols-1; ++j)
@@ -44,7 +43,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
                                   oInitFrame.at<cv::Vec3b>(i,j+1), oInitFrame.at<cv::Vec3b>(i+1,j-1), oInitFrame.at<cv::Vec3b>(i+1,j), oInitFrame.at<cv::Vec3b>(i+1,j+1)};
             //loop to put 20 random neighbours in the tmp vector
             for(int k = 0; k < 20; ++k)
-                tmp.push_back(neighbours[neighbours]);
+                tmp.push_back(neighbours[rand() % 8]);
             //add the sample vector to the background model
             background.push_back(tmp);
         }
@@ -60,7 +59,6 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     CV_Assert(!oCurrFrame.empty() && oCurrFrame.isContinuous() && oCurrFrame.type()==CV_8UC3);
     oOutputMask.create(oCurrFrame.size(),CV_8UC1); // output is binary, but always stored in a byte (so output values are either '0' or '255')
 
-    // ... @@@@@ TODO
     int coo = 0;
     //loop over the current frame
     for(int i = 1; i < oCurrFrame.rows-1; i++)
@@ -80,18 +78,18 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             if(nbOk == 2)
             {
                 oOutputMask.at<uchar>(i,j) = 0;
-                int ran = rand() % 16;
-                cv::Vec3b newValue = oCurrFrame.at<cv::Vec3b>(i,j);
-                if(!ran)
-                {
+                cv::Vec3b newValue = oCurrFrame.at<cv::Vec3b>(i,j);  //the current pixel value
+                //update background model
+                //add the new sample with 1/16 probability
+                if(!(rand() % 16))
                     background.at(coo).at(rand() % 20) = newValue;
-                }
 
+                //update neighbours
                 if(i != 1 && i != oCurrFrame.rows -2 && j != 1 && j != oCurrFrame.cols -2)
                 {
-                    ran = rand() % 16;
-                    if(!ran){
-                        int neighbours = rand() % 8;
+                    //only with a 1/16 probability
+                    if(!(rand()%16)){
+                        int neighbours = rand() % 8; //get 1 random neighbours to be updated
                         if(neighbours == 0)
                             background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
                         else if (neighbours == 1)
