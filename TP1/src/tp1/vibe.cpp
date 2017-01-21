@@ -106,12 +106,8 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
                             background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
                         else if (neighbours == 7)
                             background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
-
-
                     }
                 }
-
-
             }
             //pixel is foreground
             else {
@@ -119,6 +115,15 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             }
         }
     }
+
+    //improvment with morphological operations
+//    int erosion_size = 2;
+//    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS,
+//                          cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+//                          cv::Point(erosion_size, erosion_size) );
+
+//    cv::erode(oOutputMask, oOutputMask, element);
+//    cv::dilate(oOutputMask, oOutputMask, element);
 
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
 

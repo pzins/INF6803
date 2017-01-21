@@ -23,7 +23,7 @@ int main(int /*argc*/, char** /*argv*/) {
             cv::Mat oOutputMask(oInitFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0));
             BinClassif oSeqAccumMetrics;
             for(size_t nFrameIdx=1; nFrameIdx<vnSequenceSizes[nSeqIdx]; ++nFrameIdx) {
-                std::cout << "\tProcessing input # " << nFrameIdx+1 << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
+                //std::cout << "\tProcessing input # " << nFrameIdx+1 << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
                 const std::string sCurrFramePath = putf((sBaseDataPath+vsSequenceNames[nSeqIdx]+"/input/in%06d.jpg").c_str(),(int)(nFrameIdx+1));
                 const cv::Mat oCurrFrame = cv::imread(sCurrFramePath);
                 CV_Assert(!oCurrFrame.empty() && oInitFrame.size()==oCurrFrame.size() && oCurrFrame.type()==CV_8UC3);
@@ -34,14 +34,21 @@ int main(int /*argc*/, char** /*argv*/) {
                 CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.size()==oCurrFrame.size() && oCurrGTMask.type()==CV_8UC1);
                 oSeqAccumMetrics.accumulate(oOutputMask,oCurrGTMask); // we accumulate TP/TN/FP/FN here
                 // for display purposes only
+                /*
                 cv::imshow("input",oCurrFrame);
                 cv::imshow("gt",oCurrGTMask);
-                cv::imshow("output",oOutputMask);
+                cv::imshow("output",oOutputMask);*/
                 cv::waitKey(1);
             }
 
             // @@@@ TODO : using total TP/TN/FP/FN counts in oSeqAccumMetrics, compute and print overall precision, recall, and f-measure here
-
+            double precision = double(oSeqAccumMetrics.nTP) / (double(oSeqAccumMetrics.nTP) + double(oSeqAccumMetrics.nFP));
+            double recall = double(oSeqAccumMetrics.nTP) / (double(oSeqAccumMetrics.nTP) + double(oSeqAccumMetrics.nFN));
+            double fmeasure = (2 * precision * recall) / (precision + recall);
+            std::cout << "Sequence " << vsSequenceNames[nSeqIdx] << " : "<< std::endl;
+            std::cout << "* precision : " << precision << std::endl;
+            std::cout << "* recall    : " << recall << std::endl;
+            std::cout << "* f-measure : " << fmeasure << std::endl;
         }
         std::cout << "\nAll done." << std::endl;
     }
@@ -59,3 +66,50 @@ int main(int /*argc*/, char** /*argv*/) {
 #endif //def(_MSC_VER)
     return 0;
 }
+
+
+/** results
+
+ Sans amélioration
+ Processing sequence 'highway'...
+ Sequence highway :
+ * precision : 0.819642
+ * recall    : 0.915687
+ * f-measure : 0.865007
+
+ Processing sequence 'pedestrians'...
+ Sequence pedestrians :
+ * precision : 0.668607
+ * recall    : 0.968946
+ * f-measure : 0.791234
+
+ Processing sequence 'fountain02'...
+ Sequence fountain02 :
+ * precision : 0.115645
+ * recall    : 0.919358
+ * f-measure : 0.205446
+
+ All done.
+
+ Avec amelioration opérations morphologiques
+
+ Processing sequence 'highway'...
+ Sequence highway :
+ * precision : 0.929322
+ * recall    : 0.876416
+ * f-measure : 0.902094
+
+ Processing sequence 'pedestrians'...
+ Sequence pedestrians :
+ * precision : 0.932296
+ * recall    : 0.959588
+ * f-measure : 0.945745
+
+ Processing sequence 'fountain02'...
+ Sequence fountain02 :
+ * precision : 0.65878
+ * recall    : 0.891093
+ * f-measure : 0.757526
+
+ All done.
+**/
