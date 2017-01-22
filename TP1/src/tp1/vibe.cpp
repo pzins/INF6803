@@ -50,8 +50,8 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     }
 }
 
-//function which checks wether two pixel are close
-bool isInSphere(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
+//function which determines the similarity between two pixels
+bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
     return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= seuil);
 }
 
@@ -70,7 +70,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             coo = (i-1)*(oCurrFrame.cols-2)+j-1;    //compute coordinate (i,j) for the vector background model (1 dimension)
             //loop to check if a pixel is background or foreground
             while (nbOk < 2 && counter < 20){
-                if(isInSphere(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j), 20)){
+                if(isSimilar(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j), 20)){
                     nbOk++;
                 }
             }
