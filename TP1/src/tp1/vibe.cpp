@@ -52,7 +52,8 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 
 //function which determines the similarity between two pixels
 bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
-    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= seuil);
+//    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= seuil);
+       return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= 40);
 }
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
@@ -117,13 +118,13 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     }
 
     //improvment with morphological operations
-//    int erosion_size = 2;
-//    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS,
-//                          cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
-//                          cv::Point(erosion_size, erosion_size) );
+    int erosion_size = 2;
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS,
+                          cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+                          cv::Point(erosion_size, erosion_size) );
 
-//    cv::erode(oOutputMask, oOutputMask, element);
-//    cv::dilate(oOutputMask, oOutputMask, element);
+    cv::erode(oOutputMask, oOutputMask, element);
+    cv::dilate(oOutputMask, oOutputMask, element);
 
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
 
