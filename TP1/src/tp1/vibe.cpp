@@ -58,7 +58,7 @@ bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     CV_Assert(!oCurrFrame.empty() && oCurrFrame.isContinuous() && oCurrFrame.type()==CV_8UC3);
-    oOutputMask.create(oCurrFrame.size(),CV_8UC1); // output is binary, but always stored in a byte (so output values are either '0' or '255')
+    oOutputMask.create(oCurrFrame.size(),); // output is binary, but always stored in a byte (so output values are either '0' or '255')
 
     int coo = 0;
     //loop over the current frame
