@@ -101,7 +101,8 @@ bool ViBe_impl::checkDescriptor(cv::Vec3b curPixel, const cv::Mat& oCurrFrame, i
               distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
               distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j)) * 64 +
               distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j+1)) * 128;
-    if(res - descriptors.at(coo) < 10){
+//    std::cout << descriptors.at(coo) << " " << res << std::endl;
+    if(res - descriptors.at(coo) == 0){
         descriptors.at(coo) = res;
         return true;
     }
@@ -125,9 +126,13 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             int counter = 0;
             coo = (i-1)*(oCurrFrame.cols-2)+j-1;    //compute coordinate (i,j) for the vector background model (1 dimension)
             cv::Vec3b curPix = oCurrFrame.at<cv::Vec3b>(i,j);
+            if(checkDescriptor(curPix, oCurrFrame, i, j, coo))
+            {
+                nbOk = m_nMin;
+            }
             //loop to check if a pixel is background or foreground
             while (nbOk < m_nMin && counter < m_N){
-                if(isSimilar(background.at(coo).at(counter++), curPix) && checkDescriptor(curPix, oCurrFrame, i, j, coo)){
+                if(isSimilar(background.at(coo).at(counter++), curPix)){
                     nbOk++;
                 }
             }
@@ -174,13 +179,17 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     }
 
     //improvment with morphological operations
-    int erosion_size = 2;
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-                          cv::Size( erosion_size + 1,  erosion_size + 1),
-                          cv::Point(erosion_size, erosion_size) );
+//    int erosion_size = 2;
+//    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+//                              cv::Size( erosion_size + 1,  erosion_size + 1),
+//                          cv::Point(erosion_size, erosion_size));
 
-    cv::erode(oOutputMask, oOutputMask, element);
-    cv::dilate(oOutputMask, oOutputMask, element);
+//    cv::erode(oOutputMask, oOutputMask, element);
+//    erosion_size = 4;
+//    element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+//                              cv::Size( erosion_size + 1,  erosion_size + 1),
+//                          cv::Point(erosion_size, erosion_size));
+//    cv::dilate(oOutputMask, oOutputMask, element);
 
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
 
