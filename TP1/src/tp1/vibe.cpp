@@ -13,8 +13,11 @@ struct ViBe_impl : ViBe {
 
 
     bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
+    bool checkDescriptor(cv::Vec3b curPixel, const cv::Mat &oCurrFrame, int i, int j, int coo);
+
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
+    std::vector<int> descriptors;
 
 };
 
@@ -27,6 +30,13 @@ ViBe_impl::ViBe_impl(size_t N, size_t R, size_t nMin, size_t nSigma) :
     m_R(R),
     m_nMin(nMin),
     m_nSigma(nSigma) {}
+
+int distance(cv::Vec3b pix, cv::Vec3b neighbour){
+    if(pix.val[0]+pix.val[1]+pix.val[2] <= neighbour.val[0]+neighbour.val[1]+neighbour.val[2])
+        return 0;
+    else
+        return 1;
+}
 
 
 void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
@@ -48,6 +58,15 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
                 tmp.push_back(neighbours[rand() % 8]);
             //add the sample vector to the background model
             background.push_back(tmp);
+            cv::Vec3b curPixel = oInitFrame.at<cv::Vec3b>(i,j);
+            descriptors.push_back(distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j)) * 2 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j-1)) * 8 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j+1)) * 16 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j)) * 64 +
+                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j+1)) * 128);
         }
     }
 }
@@ -55,7 +74,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 //function which determines the similarity between two pixels
 bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
 //    L2 distance
-//    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m-R);
+    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m_R);
 //    L1 distance
 //    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
 
@@ -70,8 +89,25 @@ bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
     return (sqrt(pow(res_pix.at<cv::Vec3b>(0).val[0]-res_samples.at<cv::Vec3b>(0).val[0],2) +
                  pow(res_pix.at<cv::Vec3b>(0).val[1]-res_samples.at<cv::Vec3b>(0).val[1],2) +
                  pow(res_pix.at<cv::Vec3b>(0).val[2]-res_samples.at<cv::Vec3b>(0).val[2],2)) <= m_R);
+}
 
 
+bool ViBe_impl::checkDescriptor(cv::Vec3b curPixel, const cv::Mat& oCurrFrame, int i, int j, int coo){
+    int res = distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j)) * 2 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i,j-1)) * 8 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i,j+1)) * 16 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j)) * 64 +
+              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j+1)) * 128;
+    if(res - descriptors.at(coo) < 10){
+        descriptors.at(coo) = res;
+        return true;
+    }
+
+    descriptors.at(coo) = res;
+    return false;
 }
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
@@ -88,9 +124,10 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             int nbOk = 0;   //number of samples pixels which are close to the current pixel
             int counter = 0;
             coo = (i-1)*(oCurrFrame.cols-2)+j-1;    //compute coordinate (i,j) for the vector background model (1 dimension)
+            cv::Vec3b curPix = oCurrFrame.at<cv::Vec3b>(i,j);
             //loop to check if a pixel is background or foreground
             while (nbOk < m_nMin && counter < m_N){
-                if(isSimilar(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j))){
+                if(isSimilar(background.at(coo).at(counter++), curPix) && checkDescriptor(curPix, oCurrFrame, i, j, coo)){
                     nbOk++;
                 }
             }
@@ -138,8 +175,8 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
 
     //improvment with morphological operations
     int erosion_size = 2;
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS,
-                          cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                          cv::Size( erosion_size + 1,  erosion_size + 1),
                           cv::Point(erosion_size, erosion_size) );
 
     cv::erode(oOutputMask, oOutputMask, element);

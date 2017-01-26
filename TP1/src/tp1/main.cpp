@@ -1,7 +1,7 @@
 
 #include "tp1/common.hpp"
 
-#define VIBE_N 20       // @@@@ TUNE IF NEEDED
+#define VIBE_N 40       // @@@@ TUNE IF NEEDED
 #define VIBE_R 20       // @@@@ TUNE IF NEEDED
 #define VIBE_NMIN 2     // @@@@ TUNE IF NEEDED
 #define VIBE_NSIGMA 16  // @@@@ TUNE IF NEEDED
