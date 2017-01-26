@@ -11,6 +11,8 @@ struct ViBe_impl : ViBe {
     const size_t m_nMin; //< internal ViBe parameter; required number of matches for background classification
     const size_t m_nSigma; //< internal ViBe parameter; model update rate
 
+
+    bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
 
@@ -42,7 +44,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
             cv::Vec3b neighbours[] = {oInitFrame.at<cv::Vec3b>(i-1,j-1), oInitFrame.at<cv::Vec3b>(i-1,j), oInitFrame.at<cv::Vec3b>(i-1,j+1), oInitFrame.at<cv::Vec3b>(i,j-1),
                                   oInitFrame.at<cv::Vec3b>(i,j+1), oInitFrame.at<cv::Vec3b>(i+1,j-1), oInitFrame.at<cv::Vec3b>(i+1,j), oInitFrame.at<cv::Vec3b>(i+1,j+1)};
             //loop to put 20 random neighbours in the tmp vector
-            for(int k = 0; k < 20; ++k)
+            for(int k = 0; k < m_N; ++k)
                 tmp.push_back(neighbours[rand() % 8]);
             //add the sample vector to the background model
             background.push_back(tmp);
@@ -51,14 +53,16 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 }
 
 //function which determines the similarity between two pixels
-bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples, int seuil){
-//    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= seuil);
-       return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= 40);
+bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
+//    L2 distance
+//    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m-R);
+//    L1 distance
+    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
 }
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     CV_Assert(!oCurrFrame.empty() && oCurrFrame.isContinuous() && oCurrFrame.type()==CV_8UC3);
-    oOutputMask.create(oCurrFrame.size(),); // output is binary, but always stored in a byte (so output values are either '0' or '255')
+    oOutputMask.create(oCurrFrame.size(),CV_8UC1); // output is binary, but always stored in a byte (so output values are either '0' or '255')
 
     int coo = 0;
     //loop over the current frame
@@ -70,43 +74,43 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             int counter = 0;
             coo = (i-1)*(oCurrFrame.cols-2)+j-1;    //compute coordinate (i,j) for the vector background model (1 dimension)
             //loop to check if a pixel is background or foreground
-            while (nbOk < 2 && counter < 20){
-                if(isSimilar(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j), 20)){
+            while (nbOk < m_nMin && counter < m_N){
+                if(isSimilar(background.at(coo).at(counter++), oCurrFrame.at<cv::Vec3b>(i,j))){
                     nbOk++;
                 }
             }
             //pixel is background
-            if(nbOk == 2)
+            if(nbOk == m_nMin)
             {
                 oOutputMask.at<uchar>(i,j) = 0;
                 cv::Vec3b newValue = oCurrFrame.at<cv::Vec3b>(i,j);  //the current pixel value
                 //update background model
-                //add the new sample with 1/16 probability
-                if(!(rand() % 16))
-                    background.at(coo).at(rand() % 20) = newValue;
+                //add the new sample with m_nSigma probability
+                if(!(rand() % m_nSigma))
+                    background.at(coo).at(rand() % m_N) = newValue;
 
                 //update neighbours
                 if(i != 1 && i != oCurrFrame.rows -2 && j != 1 && j != oCurrFrame.cols -2)
                 {
                     //only with a 1/16 probability
-                    if(!(rand()%16)){
+                    if(!(rand()%m_nSigma)){
                         int neighbours = rand() % 8; //get 1 random neighbours to be updated
                         if(neighbours == 0)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                            background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = newValue;
                         else if (neighbours == 1)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
+                            background.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = newValue;
                         else if (neighbours == 2)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                            background.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = newValue;
                         else if (neighbours == 3)
-                            background.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                            background.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = newValue;
                         else if (neighbours == 4)
-                            background.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                            background.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = newValue;
                         else if (neighbours == 5)
-                            background.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%20) = newValue;
+                            background.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = newValue;
                         else if (neighbours == 6)
-                            background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%20) = newValue;
+                            background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = newValue;
                         else if (neighbours == 7)
-                            background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%20) = newValue;
+                            background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = newValue;
                     }
                 }
             }
