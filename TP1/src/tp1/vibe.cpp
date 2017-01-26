@@ -57,12 +57,27 @@ bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
 //    L2 distance
 //    return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m-R);
 //    L1 distance
-    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
+//    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
+
+//    HSV color model
+    cv::Mat input_pix(1,1,CV_8UC3);
+    input_pix.at<cv::Vec3b>(0,0) = pix;
+    cv::Mat input_samples(1,1, CV_8UC3);
+    input_samples.at<cv::Vec3b>(0,0) = samples;
+    cv::Mat res_pix(input_pix), res_samples(input_samples);
+    cv::cvtColor(input_pix, res_pix, CV_BGR2HLS);
+    cv::cvtColor(input_samples, res_samples, CV_BGR2HLS);
+    return (sqrt(pow(res_pix.at<cv::Vec3b>(0).val[0]-res_samples.at<cv::Vec3b>(0).val[0],2) +
+                 pow(res_pix.at<cv::Vec3b>(0).val[1]-res_samples.at<cv::Vec3b>(0).val[1],2) +
+                 pow(res_pix.at<cv::Vec3b>(0).val[2]-res_samples.at<cv::Vec3b>(0).val[2],2)) <= m_R);
+
+
 }
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     CV_Assert(!oCurrFrame.empty() && oCurrFrame.isContinuous() && oCurrFrame.type()==CV_8UC3);
     oOutputMask.create(oCurrFrame.size(),CV_8UC1); // output is binary, but always stored in a byte (so output values are either '0' or '255')
+
 
     int coo = 0;
     //loop over the current frame
