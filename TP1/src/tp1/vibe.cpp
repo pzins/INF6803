@@ -14,6 +14,7 @@ struct ViBe_impl : ViBe {
 
     bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
     bool checkDescriptor(cv::Vec3b curPixel, const cv::Mat &oCurrFrame, int i, int j, int coo);
+    int computeLBP(const cv::Mat& area);
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
@@ -38,6 +39,19 @@ int distance(cv::Vec3b pix, cv::Vec3b neighbour){
         return 1;
 }
 
+int ViBe_impl::computeLBP(const cv::Mat& area){
+    CV_Assert(area.cols == 3 && area.rows == 3);
+    cv::Vec3b centerPixel = area.at<cv::Vec3b>(1,1);
+    int counter = 0;
+    int res = 0;
+    for(int i = 0; i < area.rows; ++i){
+        for(int j = 0; j < area.cols; ++j){
+            if(!(i==1&&j==1))
+                res += distance(centerPixel, area.at<cv::Vec3b>(i,j)) * pow(counter++,2);
+        }
+    }
+    return res;
+}
 
 void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     CV_Assert(!oInitFrame.empty() && oInitFrame.isContinuous() && oInitFrame.type()==CV_8UC3);
@@ -59,14 +73,20 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
             //add the sample vector to the background model
             background.push_back(tmp);
             cv::Vec3b curPixel = oInitFrame.at<cv::Vec3b>(i,j);
-            descriptors.push_back(distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j)) * 2 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j-1)) * 8 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j+1)) * 16 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j)) * 64 +
-                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j+1)) * 128);
+//            descriptors.push_back(distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j)) * 2 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j-1)) * 8 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j+1)) * 16 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j)) * 64 +
+//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j+1)) * 128);
+//            const cv::Mat X = oInitFrame(cv::Rect(i-1, j-1, 3, 3));
+            int i_max = std::min(i-1, oInitFrame.rows-4);
+            int j_max = std::min(j-1, oInitFrame.cols-4);
+//            cv::Mat roi(oInitFrame, cv::Rect(i-1,j-1,3,3));
+
+//            descriptors.push_back(computeLBP(X));
         }
     }
 }
