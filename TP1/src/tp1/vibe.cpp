@@ -15,7 +15,7 @@ struct ViBe_impl : ViBe {
 
     bool checkDescriptor(const cv::Mat &currentArea, int coo);
     bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
-    void ViBe_impl::applyMorpho(cv::Mat& oOutputMask);
+    void applyMorpho(cv::Mat& oOutputMask);
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
