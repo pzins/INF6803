@@ -1,5 +1,7 @@
 
 #include "tp1/common.hpp"
+int computeLBP(const cv::Mat& area);
+int distanceLBP(cv::Vec3b pix, cv::Vec3b neighbour);
 
 // local implementation for ViBe segmentation algorithm
 struct ViBe_impl : ViBe {
@@ -11,16 +13,13 @@ struct ViBe_impl : ViBe {
     const size_t m_nMin; //< internal ViBe parameter; required number of matches for background classification
     const size_t m_nSigma; //< internal ViBe parameter; model update rate
 
-
-    bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
     bool checkDescriptor(const cv::Mat &currentArea, int coo);
-    int computeLBP(const cv::Mat& area);
+    bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
+    void ViBe_impl::applyMorpho(cv::Mat& oOutputMask);
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
     std::vector<std::vector<int>> descriptors; //descriptors samples for each pixels
-//    std::vector<int> descriptors;
-
 };
 
 std::shared_ptr<ViBe> ViBe::createInstance(size_t N, size_t R, size_t nMin, size_t nSigma) {
@@ -33,26 +32,6 @@ ViBe_impl::ViBe_impl(size_t N, size_t R, size_t nMin, size_t nSigma) :
     m_nMin(nMin),
     m_nSigma(nSigma) {}
 
-int distance(cv::Vec3b pix, cv::Vec3b neighbour){
-    if(abs(pix.val[0]+pix.val[1]+pix.val[2] - neighbour.val[0]+neighbour.val[1]+neighbour.val[2]) <= 0.365*)
-        return 1;
-    else
-        return 0;
-}
-
-int ViBe_impl::computeLBP(const cv::Mat& area){
-    CV_Assert(area.cols == 3 && area.rows == 3);
-    cv::Vec3b centerPixel = area.at<cv::Vec3b>(1,1);
-    int counter = 0;
-    int res = 0;
-    for(int i = 0; i < area.rows; ++i){
-        for(int j = 0; j < area.cols; ++j){
-            if(!(i==1&&j==1))
-                res += distance(centerPixel, area.at<cv::Vec3b>(i,j), ) * pow(counter++,2);
-        }
-    }
-    return res;
-}
 
 void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     CV_Assert(!oInitFrame.empty() && oInitFrame.isContinuous() && oInitFrame.type()==CV_8UC3);
@@ -75,19 +54,9 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
             //add the sample vector to the background model
             background.push_back(tmp);
             cv::Vec3b curPixel = oInitFrame.at<cv::Vec3b>(i,j);
-//            descriptors.push_back(distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j)) * 2 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j-1)) * 8 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i,j+1)) * 16 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j)) * 64 +
-//                                   distance(curPixel, oInitFrame.at<cv::Vec3b>(i+1,j+1)) * 128);
-//            const cv::Mat X = oInitFrame(cv::Rect(i-1, j-1, 3, 3));
             cv::Mat roi;
             cv::Rect rect;
             rect = cv::Rect(j-1, i-1, 3, 3);
-//            std::cout << i-1  << " " << j-1 << " " << oInitFrame.rows << " " << oInitFrame.cols << std::endl;
             roi= oInitFrame(rect);
             int LBPvalue= computeLBP(roi);
             std::vector<int> tmp2; //contain samples for 1 pixel
@@ -98,33 +67,32 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     }
 }
 
-//function which determines the similarity between two pixels
 bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
 //    L2 distance
     return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m_R);
+
 //    L1 distance
 //    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
 
-    /*
 //    HSV color model
-    cv::Mat input_pix(1,1,CV_8UC3);
-    input_pix.at<cv::Vec3b>(0,0) = pix;
-    cv::Mat input_samples(1,1, CV_8UC3);
-    input_samples.at<cv::Vec3b>(0,0) = samples;
-    cv::Mat res_pix(input_pix), res_samples(input_samples);
-    cv::cvtColor(input_pix, res_pix, CV_BGR2HLS);
-    cv::cvtColor(input_samples, res_samples, CV_BGR2HLS);
-    return (sqrt(pow(res_pix.at<cv::Vec3b>(0).val[0]-res_samples.at<cv::Vec3b>(0).val[0],2) +
-                 pow(res_pix.at<cv::Vec3b>(0).val[1]-res_samples.at<cv::Vec3b>(0).val[1],2) +
-                 pow(res_pix.at<cv::Vec3b>(0).val[2]-res_samples.at<cv::Vec3b>(0).val[2],2)) <= m_R);
-*/
+//    cv::Mat input_pix(1,1,CV_8UC3);
+//    input_pix.at<cv::Vec3b>(0,0) = pix;
+//    cv::Mat input_samples(1,1, CV_8UC3);
+//    input_samples.at<cv::Vec3b>(0,0) = samples;
+//    cv::Mat res_pix(input_pix), res_samples(input_samples);
+//    cv::cvtColor(input_pix, res_pix, CV_BGR2HLS);
+//    cv::cvtColor(input_samples, res_samples, CV_BGR2HLS);
+//    return (sqrt(pow(res_pix.at<cv::Vec3b>(0).val[0]-res_samples.at<cv::Vec3b>(0).val[0],2) +
+//                 pow(res_pix.at<cv::Vec3b>(0).val[1]-res_samples.at<cv::Vec3b>(0).val[1],2) +
+//                 pow(res_pix.at<cv::Vec3b>(0).val[2]-res_samples.at<cv::Vec3b>(0).val[2],2)) <= m_R);
 
-//  image distorsion
-    int xt = pow(pix.val[0],2)+pow(pix.val[1],2)+pow(pix.val[2],2);
-    int vi = pow(samples.val[0],2)+pow(samples.val[1],2)+pow(samples.val[2],2);
-    int xtvi = pix.val[0]*samples.val[0]*pix.val[1]*samples.val[1]*pix.val[2]*samples.val[2];
-    float p2 =    xtvi / vi;
-    return sqrt(xt-p2) <= m_R;
+
+//    image distorsion
+//    int xt = pow(pix.val[0],2)+pow(pix.val[1],2)+pow(pix.val[2],2);
+//    int vi = pow(samples.val[0],2)+pow(samples.val[1],2)+pow(samples.val[2],2);
+//    int xtvi = pix.val[0]*samples.val[0]*pix.val[1]*samples.val[1]*pix.val[2]*samples.val[2];
+//    float p2 =    xtvi / vi;
+//    return sqrt(xt-p2) <= m_R;
 }
 
 
@@ -132,36 +100,31 @@ bool ViBe_impl::checkDescriptor(const cv::Mat& currentArea, int coo){
     int res = computeLBP(currentArea);
     int counter = 0;
     int k = 0;
-    while(counter <2 && k < m_N){
+    while(counter < m_nMin && k < m_N){
         if(res == descriptors.at(coo).at(k++))
             counter++;
     }
-    if (counter == 2){
+    if (counter == m_nMin){
         int randomIndex = rand() % m_N;
         descriptors.at(coo).at(randomIndex) = res;
         return true;
     }
     return false;
+}
 
-//    int res = distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j-1)) * 1 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j)) * 2 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i-1,j+1)) * 4 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i,j-1)) * 8 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i,j+1)) * 16 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j-1)) * 32 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j)) * 64 +
-//              distance(curPixel, oCurrFrame.at<cv::Vec3b>(i+1,j+1)) * 128;
-//    std::cout << descriptors.at(coo) << " " << res << std::endl;
+void ViBe_impl::applyMorpho(cv::Mat& oOutputMask){
+    //improvment with morphological operations
+    int erosion_size = 2;
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                              cv::Size( erosion_size + 1,  erosion_size + 1),
+                          cv::Point(erosion_size, erosion_size));
 
-    /*
-    if(res - descriptors.at(coo) == 0){
-        descriptors.at(coo) = res;
-        return true;
-    }
-
-    descriptors.at(coo) = res;
-    return false;
-    */
+    cv::erode(oOutputMask, oOutputMask, element);
+    erosion_size = 4;
+    element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                              cv::Size( erosion_size + 1,  erosion_size + 1),
+                          cv::Point(erosion_size, erosion_size));
+    cv::dilate(oOutputMask, oOutputMask, element);
 }
 
 void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
@@ -188,6 +151,8 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             if(checkDescriptor(roi, coo))
             {
                 nbOk = m_nMin; //we quit directly
+            } else{
+                counter = m_N;
             }
             //loop to check if a pixel is background or foreground
             while (nbOk < m_nMin && counter < m_N){
@@ -237,19 +202,30 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
         }
     }
 
-//    //improvment with morphological operations
-//    int erosion_size = 2;
-//    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                              cv::Size( erosion_size + 1,  erosion_size + 1),
-//                          cv::Point(erosion_size, erosion_size));
-
-//    cv::erode(oOutputMask, oOutputMask, element);
-//    erosion_size = 4;
-//    element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-//                              cv::Size( erosion_size + 1,  erosion_size + 1),
-//                          cv::Point(erosion_size, erosion_size));
-//    cv::dilate(oOutputMask, oOutputMask, element);
-
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
 
 }
+
+
+
+int distanceLBP(cv::Vec3b pix, cv::Vec3b neighbour){
+    if(abs(pix.val[0]+pix.val[1]+pix.val[2] - neighbour.val[0]+neighbour.val[1]+neighbour.val[2]) <= 0.365*0.299*pix.val[2]+0.587*pix.val[1]*0.114*pix.val[0])
+        return 1;
+    else
+        return 0;
+}
+
+int computeLBP(const cv::Mat& area){
+    CV_Assert(area.cols == 3 && area.rows == 3);
+    cv::Vec3b centerPixel = area.at<cv::Vec3b>(1,1);
+    int counter = 0;
+    int res = 0;
+    for(int i = 0; i < area.rows; ++i){
+        for(int j = 0; j < area.cols; ++j){
+            if(!(i==1&&j==1))
+                res += distanceLBP(centerPixel, area.at<cv::Vec3b>(i,j)) * pow(counter++,2);
+        }
+    }
+    return res;
+}
+
