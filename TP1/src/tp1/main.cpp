@@ -22,7 +22,7 @@ int main(int /*argc*/, char** /*argv*/) {
             cv::Mat oOutputMask(oInitFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0));
             BinClassif oSeqAccumMetrics;
             for(size_t nFrameIdx=1; nFrameIdx<vnSequenceSizes[nSeqIdx]; ++nFrameIdx) {
-                std::cout << "\tProcessing input # " << nFrameIdx+1 << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
+//                std::cout << "\tProcessing input # " << nFrameIdx+1 << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
                 const std::string sCurrFramePath = putf((sBaseDataPath+vsSequenceNames[nSeqIdx]+"/input/in%06d.jpg").c_str(),(int)(nFrameIdx+1));
                 const cv::Mat oCurrFrame = cv::imread(sCurrFramePath);
                 CV_Assert(!oCurrFrame.empty() && oInitFrame.size()==oCurrFrame.size() && oCurrFrame.type()==CV_8UC3);
@@ -44,9 +44,9 @@ int main(int /*argc*/, char** /*argv*/) {
             double recall = double(oSeqAccumMetrics.nTP) / (double(oSeqAccumMetrics.nTP) + double(oSeqAccumMetrics.nFN));
             double fmeasure = (2 * precision * recall) / (precision + recall);
             std::cout << "Sequence " << vsSequenceNames[nSeqIdx] << " : "<< std::endl;
-            std::cout << "* precision : " << precision << std::endl;
-            std::cout << "* recall    : " << recall << std::endl;
-            std::cout << "* f-measure : " << fmeasure << std::endl;
+            std::cout << "  precision : " << precision << std::endl;
+            std::cout << "  recall    : " << recall << std::endl;
+            std::cout << "  f-measure : " << fmeasure << std::endl;
         }
         std::cout << "\nAll done." << std::endl;
     }
@@ -111,3 +111,87 @@ int main(int /*argc*/, char** /*argv*/) {
 
  All done.
 **/
+
+/** jeudi
+* sans amelioration
+*
+* Sequence highway :
+* precision : 0.878139
+* recall    : 0.895546
+* f-measure : 0.886757
+
+
+* Sequence pedestrians :
+* precision : 0.762849
+* recall    : 0.964541
+* f-measure : 0.85192
+
+
+* Sequence fountain02 :
+* precision : 0.212932
+* recall    : 0.896142
+* f-measure : 0.344102
+
+* avec ameliorations LBP
+*
+* Processing sequence 'highway'...
+Sequence highway :
+  precision : 0.922162
+  recall    : 0.824881
+  f-measure : 0.870813
+
+Processing sequence 'pedestrians'...
+Sequence pedestrians :
+  precision : 0.89223
+  recall    : 0.900588
+  f-measure : 0.896389
+
+Processing sequence 'fountain02'...
+Sequence fountain02 :
+  precision : 0.420048
+  recall    : 0.84175
+
+
+amelioration LBP + morpho
+Processing sequence 'highway'...
+Sequence highway :
+  precision : 0.926611
+  recall    : 0.927764
+  f-measure : 0.927187
+
+Processing sequence 'pedestrians'...
+Sequence pedestrians :
+  precision : 0.883191
+  recall    : 0.975773
+  f-measure : 0.927177
+
+Processing sequence 'fountain02'...
+Sequence fountain02 :
+  precision : 0.839283
+  recall    : 0.931654
+  f-measure : 0.88306
+
+
+  amelioration que morpho
+Processing sequence 'highway'...
+Sequence highway :
+  precision : 0.917173
+  recall    : 0.964485
+  f-measure : 0.940234
+
+Processing sequence 'pedestrians'...
+Sequence pedestrians :
+  precision : 0.81694
+  recall    : 0.990933
+  f-measure : 0.895563
+
+Processing sequence 'fountain02'...
+Sequence fountain02 :
+  precision : 0.461353
+  recall    : 0.94663
+  f-measure : 0.620364
+
+
+
+
+*/
