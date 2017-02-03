@@ -15,7 +15,7 @@ struct ViBe_impl : ViBe {
 
     bool checkDescriptor(const cv::Mat &currentArea, int coo);
     bool isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples);
-    void ViBe_impl::applyMorpho(cv::Mat& oOutputMask);
+    void applyMorpho(cv::Mat& oOutputMask);
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
     std::vector<std::vector<cv::Vec3b>> background; //background model
@@ -201,7 +201,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             }
         }
     }
-
+    cv::medianBlur(oOutputMask, oOutputMask, 9);
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
 
 }
