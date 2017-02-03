@@ -34,10 +34,10 @@ ViBe_impl::ViBe_impl(size_t N, size_t R, size_t nMin, size_t nSigma) :
     m_nSigma(nSigma) {}
 
 int distance(cv::Vec3b pix, cv::Vec3b neighbour){
-    if(pix.val[0]+pix.val[1]+pix.val[2] <= neighbour.val[0]+neighbour.val[1]+neighbour.val[2])
-        return 0;
-    else
+    if(abs(pix.val[0]+pix.val[1]+pix.val[2] - neighbour.val[0]+neighbour.val[1]+neighbour.val[2]) <= 0.365*)
         return 1;
+    else
+        return 0;
 }
 
 int ViBe_impl::computeLBP(const cv::Mat& area){
@@ -48,7 +48,7 @@ int ViBe_impl::computeLBP(const cv::Mat& area){
     for(int i = 0; i < area.rows; ++i){
         for(int j = 0; j < area.cols; ++j){
             if(!(i==1&&j==1))
-                res += distance(centerPixel, area.at<cv::Vec3b>(i,j)) * pow(counter++,2);
+                res += distance(centerPixel, area.at<cv::Vec3b>(i,j), ) * pow(counter++,2);
         }
     }
     return res;
@@ -60,6 +60,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
     //loop over the initial frame (except the outer border)
     background.clear();
+    descriptors.clear();
     for(int i = 1; i < oInitFrame.rows-1; i++)
     {
         for(int j = 1; j < oInitFrame.cols-1; ++j)
@@ -104,6 +105,7 @@ bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
 //    L1 distance
 //    return (abs(pix.val[0]-samples.val[0])+abs(pix.val[1]-samples.val[1])+abs(pix.val[2]-samples.val[2]) <= m_R);
 
+    /*
 //    HSV color model
     cv::Mat input_pix(1,1,CV_8UC3);
     input_pix.at<cv::Vec3b>(0,0) = pix;
@@ -115,6 +117,14 @@ bool ViBe_impl::isSimilar(const cv::Vec3b& pix, const cv::Vec3b& samples){
     return (sqrt(pow(res_pix.at<cv::Vec3b>(0).val[0]-res_samples.at<cv::Vec3b>(0).val[0],2) +
                  pow(res_pix.at<cv::Vec3b>(0).val[1]-res_samples.at<cv::Vec3b>(0).val[1],2) +
                  pow(res_pix.at<cv::Vec3b>(0).val[2]-res_samples.at<cv::Vec3b>(0).val[2],2)) <= m_R);
+*/
+
+//  image distorsion
+    int xt = pow(pix.val[0],2)+pow(pix.val[1],2)+pow(pix.val[2],2);
+    int vi = pow(samples.val[0],2)+pow(samples.val[1],2)+pow(samples.val[2],2);
+    int xtvi = pix.val[0]*samples.val[0]*pix.val[1]*samples.val[1]*pix.val[2]*samples.val[2];
+    float p2 =    xtvi / vi;
+    return sqrt(xt-p2) <= m_R;
 }
 
 
