@@ -12,6 +12,7 @@ struct ViBe_impl : ViBe {
     const size_t m_nMin; //< internal ViBe parameter; required number of matches for background classification
     const size_t m_nSigma; //< internal ViBe parameter; model update rate
 
+    // new methods
     bool checkDescriptor(const cv::Mat &currentArea, int coo);
     bool checkIntensity(const cv::Vec3b& curPix, int coo);
     bool L2distance(const cv::Vec3b& pix, const cv::Vec3b& samples);
@@ -20,8 +21,8 @@ struct ViBe_impl : ViBe {
     int distanceLBP(cv::Vec3b pix, cv::Vec3b neighbour);
 
     // @@@@ ADD ALL REQUIRED DATA MEMBERS FOR BACKGROUND MODEL HERE
-    std::vector<std::vector<cv::Vec3b>> background; //background model
-    std::vector<std::vector<int>> descriptors; //descriptors samples for each pixels
+    std::vector<std::vector<cv::Vec3b>> intensity; //intensity background model
+    std::vector<std::vector<int>> descriptors; //descriptors background model
 };
 
 std::shared_ptr<ViBe> ViBe::createInstance(size_t N, size_t R, size_t nMin, size_t nSigma) {
@@ -40,7 +41,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 
     // hint: we work with RGB images, so the type of one pixel is a "cv::Vec3b"! (i.e. three uint8_t's are stored per pixel)
     //loop over the initial frame (except the outer border)
-    background.clear();
+    intensity.clear();
     descriptors.clear();
     for(int i = 1; i < oInitFrame.rows-1; i++)
     {
@@ -54,7 +55,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
             for(int k = 0; k < m_N; ++k)
                 tmp.push_back(neighbours[rand() % 8]);
             //add the sample vector to the background model
-            background.push_back(tmp);
+            intensity.push_back(tmp);
 
             //compute pixel LBP value
             int LBPvalue= computeLBP(oInitFrame(cv::Rect(j-1, i-1, 3, 3)));
@@ -107,7 +108,7 @@ int ViBe_impl::computeLBP(const cv::Mat& area){
     return res;
 }
 
-//copute Hamming distance between two integers
+//compute Hamming distance between two integers
 int hammingDist(int a, int b){
     int val = a ^ b;
     int dist = 0;
@@ -137,7 +138,7 @@ bool ViBe_impl::checkIntensity(const cv::Vec3b& curPix, int coo){
     int nbOk = 0, counter = 0;
     //count how many samples are close to the current pixel
     while (nbOk < m_nMin && counter < m_N)
-        if(L2distance(background.at(coo).at(counter++), curPix))
+        if(L2distance(intensity.at(coo).at(counter++), curPix))
             nbOk++;
     return (nbOk == m_nMin);
 }
@@ -166,7 +167,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
                 //update background model
                 //add the new sample with m_nSigma probability
                 if(!(rand() % m_nSigma))
-                    background.at(coo).at(rand() % m_N) = curPix;
+                    intensity.at(coo).at(rand() % m_N) = curPix;
 
                 //update neighbours
                 if(i != 1 && i != oCurrFrame.rows -2 && j != 1 && j != oCurrFrame.cols -2)
@@ -175,21 +176,21 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
                     if(!(rand()%m_nSigma)){
                         int neighbours = rand() % 8; //get 1 random neighbours to be updated
                         if(neighbours == 0)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
+                            intensity.at((i-2)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
                         else if (neighbours == 1)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = curPix;
+                            intensity.at((i-2)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = curPix;
                         else if (neighbours == 2)
-                            background.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
+                            intensity.at((i-2)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
                         else if (neighbours == 3)
-                            background.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
+                            intensity.at((i-1)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
                         else if (neighbours == 4)
-                            background.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
+                            intensity.at((i-1)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
                         else if (neighbours == 5)
-                            background.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
+                            intensity.at((i)*(oCurrFrame.cols-2)+j-2).at(rand()%m_N) = curPix;
                         else if (neighbours == 6)
-                            background.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = curPix;
+                            intensity.at((i)*(oCurrFrame.cols-2)+j-1).at(rand()%m_N) = curPix;
                         else if (neighbours == 7)
-                            background.at((i)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
+                            intensity.at((i)*(oCurrFrame.cols-2)+j).at(rand()%m_N) = curPix;
                     }
                 }
             }
