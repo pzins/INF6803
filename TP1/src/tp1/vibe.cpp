@@ -126,9 +126,10 @@ bool ViBe_impl::checkDescriptor(const cv::Mat& currentArea, int coo){
     while(counter < m_nMin && k < m_N)
         if(hammingDist(res, descriptors.at(coo).at(k++)) <= 3) //if less than 3 bit are different, it is ok
             counter++;
-    if (counter == m_nMin)
-        return (descriptors.at(coo).at(rand() % m_N) = res); //update background descriptor model
-    return false;
+    //update background dscriptor model
+    if(!(rand() % m_nSigma))
+        descriptors.at(coo).at(rand() % m_N) = res;
+    return (counter == m_nMin);
 }
 
 //check if a pixel is background with intensity
@@ -199,7 +200,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
         }
     }
 
-    cv::medianBlur(oOutputMask, oOutputMask, 9);
+//    cv::medianBlur(oOutputMask, oOutputMask, 9);
 //    applyMorpho(oOutputMask);
 }
 
