@@ -66,7 +66,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 }
 
 
-//apply morphological operation
+//apply morphological operation : ouverture
 void ViBe_impl::applyMorpho(cv::Mat& oOutputMask){
     int erosion_size = 2;
     cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
@@ -86,12 +86,12 @@ bool ViBe_impl::L2distance(const cv::Vec3b& pix, const cv::Vec3b& samples){
     return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m_R);
 }
 
-
+//get pixel intensity from RGB value
 float rgb2gray(cv::Vec3b pix){
     return 0.299 * pix.val[2] * 0.587 * pix.val[1] * 0.114 * pix.val[0];
 }
 
-//return 1 if two descriptor values are closed, and 0 otherwise
+//return 1 if the descriptor values are closed, and 0 otherwise
 int ViBe_impl::distanceLBP(cv::Vec3b pix, cv::Vec3b neighbour){
     return(abs(rgb2gray(pix)- rgb2gray(neighbour)) <= 0.365 * rgb2gray(pix));
 }
@@ -108,7 +108,7 @@ int ViBe_impl::computeLBP(const cv::Mat& area){
     return res;
 }
 
-//compute Hamming distance between two integers
+//get Hamming distance between two integers
 int hammingDist(int a, int b){
     int val = a ^ b;
     int dist = 0;
@@ -160,7 +160,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             cv::Mat roi(oCurrFrame(cv::Rect(j-1, i-1, 3, 3))); //pixel neighbourhood 3x3
 
             //pixel is background
-            if(checkIntensity(curPix, coo) && checkDescriptor(roi, coo))
+            if(checkIntensity(curPix, coo))// && checkDescriptor(roi, coo))
             {
                 oOutputMask.at<uchar>(i,j) = 0;
 
@@ -202,7 +202,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
     }
 
 //    cv::medianBlur(oOutputMask, oOutputMask, 9);
-//    applyMorpho(oOutputMask);
+    applyMorpho(oOutputMask);
 }
 
 
