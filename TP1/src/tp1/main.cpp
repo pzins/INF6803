@@ -4,7 +4,7 @@
 #define VIBE_N 20       // @@@@ TUNE IF NEEDED
 #define VIBE_R 20       // @@@@ TUNE IF NEEDED
 #define VIBE_NMIN 2     // @@@@ TUNE IF NEEDED
-#define VIBE_NSIGMA 16  // @@@@ TUNE IF NEEDED
+#define VIBE_NSIGMA 2  // @@@@ TUNE IF NEEDED
 
 int main(int /*argc*/, char** /*argv*/) {
     try {
