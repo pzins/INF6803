@@ -47,14 +47,14 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
     {
         for(int j = 1; j < oInitFrame.cols-1; ++j)
         {
-            std::vector<cv::Vec3b> tmp; //contain samples for 1 pixel
+            std::vector<cv::Vec3b> tmp; //contain intensity samples for 1 pixel
             //neighbours pixels
             cv::Vec3b neighbours[] = {oInitFrame.at<cv::Vec3b>(i-1,j-1), oInitFrame.at<cv::Vec3b>(i-1,j), oInitFrame.at<cv::Vec3b>(i-1,j+1), oInitFrame.at<cv::Vec3b>(i,j-1),
                                   oInitFrame.at<cv::Vec3b>(i,j+1), oInitFrame.at<cv::Vec3b>(i+1,j-1), oInitFrame.at<cv::Vec3b>(i+1,j), oInitFrame.at<cv::Vec3b>(i+1,j+1)};
             //loop to put m_N random neighbours in the tmp vector
             for(int k = 0; k < m_N; ++k)
                 tmp.push_back(neighbours[rand() % 8]);
-            //add the sample vector to the background model
+            //add the sample vector to the background intensity model
             intensity.push_back(tmp);
 
             //compute pixel LBP value
@@ -66,7 +66,7 @@ void ViBe_impl::initialize(const cv::Mat& oInitFrame) {
 }
 
 
-//apply morphological operation : ouverture
+//apply morphological operation : opening
 void ViBe_impl::applyMorpho(cv::Mat& oOutputMask){
     int erosion_size = 2;
     cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
@@ -81,7 +81,7 @@ void ViBe_impl::applyMorpho(cv::Mat& oOutputMask){
     cv::dilate(oOutputMask, oOutputMask, element);
 }
 
-//check if two pixels are quite similar (several options : L1 distance, L2 distance, HSV color model)
+//check if two pixels are quite similar (L2 distance)
 bool ViBe_impl::L2distance(const cv::Vec3b& pix, const cv::Vec3b& samples){
     return (sqrt(pow(pix.val[0]-samples.val[0],2) + pow(pix.val[1]-samples.val[1],2) + pow(pix.val[2]-samples.val[2],2)) <= m_R);
 }
@@ -120,14 +120,14 @@ int hammingDist(int a, int b){
     return dist;
 }
 
-//check if a pixel is background with descriptors
+//check if a pixel is background with LBP descriptors
 bool ViBe_impl::checkDescriptor(const cv::Mat& currentArea, int coo){
     int res = computeLBP(currentArea), counter = 0, k = 0;
     //count how many descriptors are close to the current pixel
     while(counter < m_nMin && k < m_N)
-        if(hammingDist(res, descriptors.at(coo).at(k++)) <= 3) //if less than 3 bit are different, it is ok
+        if(hammingDist(res, descriptors.at(coo).at(k++)) <= 3) //if less than 3 bits are different, it is ok
             counter++;
-    //update background dscriptor model
+    //update background descriptor model
     if(!(rand() % m_nSigma))
         descriptors.at(coo).at(rand() % m_N) = res;
     return (counter == m_nMin);
@@ -164,7 +164,7 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
             {
                 oOutputMask.at<uchar>(i,j) = 0;
 
-                //update background model
+                //update background intensity model
                 //add the new sample with m_nSigma probability
                 if(!(rand() % m_nSigma))
                     intensity.at(coo).at(rand() % m_N) = curPix;
@@ -201,8 +201,11 @@ void ViBe_impl::apply(const cv::Mat& oCurrFrame, cv::Mat& oOutputMask) {
         }
     }
 
-//    cv::medianBlur(oOutputMask, oOutputMask, 9);
-    applyMorpho(oOutputMask);
+    //filtre median
+    cv::medianBlur(oOutputMask, oOutputMask, 9);
+
+    //morphologic operation
+//    applyMorpho(oOutputMask);
 }
 
 
