@@ -57,6 +57,9 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 }
 
 
+int getDistanceHistogram(const std::vector<int>& refHist, const std::vector<int>& currHist){
+    
+}
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
@@ -73,9 +76,15 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         int regionSizeH =  myBox.height+ round(myBox.height/(3*dis(gen)));
         boxes.push_back(cv::Rect(x, y, regionSizeW, regionSizeH));
     }
-    for(auto i : boxes)
+    //get frame from ref rect + compute histo
+    cv::Mat myBoxFrame = oCurrFrame(myBox);
+    std::vector<int> histo_ref = getHistogram(myBoxFrame);
+    int mini_diff = 10000, mini_idx = -1;
+    for(int i = 0; i < boxes.size(); ++i)
     {
-        cv::rectangle(oCurrFrame, cv::Point(i.x, i.y), cv::Point(i.x+i.size().width, i.y+i.size().height), cv::Scalar(255,0,0));
+        cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(255,0,0));
+        std::vector<int> curr_histo = getHistogram(boxes.at(i));
+        
     }
     boxes.clear();
 

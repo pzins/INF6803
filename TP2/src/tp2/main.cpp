@@ -21,18 +21,20 @@ int main(int /*argc*/, char** /*argv*/) {
             CV_Assert(!sCurrGTLine.empty());
             std::cout << "Parsing input bounding box..." << std::endl;
             const cv::Rect oInitBBox = convertToRect(sCurrGTLine);
+            std::cout << oInitBBox.x << " " <<oInitBBox.y << std::endl;
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
             pAlgo->initialize(oInitFrame, oInitBBox);
+//            pAlgo->print();
 
             for(size_t nFrameIdx=2; nFrameIdx<=vnSequenceSizes[nSeqIdx]; ++nFrameIdx) {
-                std::cout << "\tProcessing input # " << nFrameIdx << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
+//                std::cout << "\tProcessing input # " << nFrameIdx << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
                 const std::string sCurrFramePath = putf((sBaseDataPath+vsSequenceNames[nSeqIdx]+"/img/%04d.jpg").c_str(),(int)(nFrameIdx));
                 const cv::Mat oCurrFrame = cv::imread(sCurrFramePath);
                 CV_Assert(!oCurrFrame.empty() && oInitFrame.size()==oCurrFrame.size() && oCurrFrame.type()==CV_8UC3);
                 cv::Rect oOutputBBox;
 
-                //pAlgo->apply(oCurrFrame,oOutputBBox); @@@@ TODO
+                pAlgo->apply(oCurrFrame,oOutputBBox);
 
                 std::getline(oGTFile,sCurrGTLine);
                 CV_Assert(!sCurrGTLine.empty());
