@@ -1,5 +1,7 @@
 #####################
 ## cmake config below
+#set(CMAKE_BUILD_TYPE Debug)
+
 cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE INTERNAL "")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
