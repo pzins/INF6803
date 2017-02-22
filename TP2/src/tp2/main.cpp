@@ -24,8 +24,8 @@ int main(int /*argc*/, char** /*argv*/) {
             std::cout << oInitBBox.x << " " <<oInitBBox.y << std::endl;
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
+
             pAlgo->initialize(oInitFrame, oInitBBox);
-//            pAlgo->print();
 
             for(size_t nFrameIdx=2; nFrameIdx<=vnSequenceSizes[nSeqIdx]; ++nFrameIdx) {
 //                std::cout << "\tProcessing input # " << nFrameIdx << " / " << vnSequenceSizes[nSeqIdx] << "..." << std::endl;
