@@ -18,6 +18,8 @@ std::shared_ptr<Tracker> Tracker::createInstance(){
 }
 
 std::vector<int> getHistogram(const cv::Mat& frame){
+    std::cout << "getHitogramm" << std::endl;
+
     int ddepth = CV_16S;
     int scale = 1;
     int delta = 0;
@@ -58,6 +60,7 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 
 
 int getDistanceHistogram(const std::vector<int>& refHist, const std::vector<int>& currHist){
+    std::cout << "getDistanceHistogram " << refHist.size() << " " << currHist.size() << std::endl;
     float somme = 0;
     for(int i = 0; i < refHist.size(); ++i)
     {
@@ -75,32 +78,46 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     std::uniform_real_distribution<> dis(-0.5,0.5);
     for(int i = 0; i < 10; ++i){
         double x = myBox.x+round(2*myBox.width*dis(gen));
-        x = std::max(0.0, std::min(x, oCurrFrame.cols-x));
         double y = myBox.y+round(2*myBox.height*dis(gen));
-        y = std::max(0.0, std::min(y, oCurrFrame.rows-y));
-        int regionSizeW =  std::max((double)myBox.width, std::min(myBox.width + round((myBox.width/1000)*dis(gen)), (double)oCurrFrame.cols-x));
-        int regionSizeH =  std::max((double)myBox.height, std::min(myBox.height+ round((myBox.height/1000)*dis(gen)), (double)oCurrFrame.rows-y));
 
-        boxes.push_back(cv::Rect(x, y, std::min((double)oCurrFrame.cols, (double)x+myBox.width), std::min((double)oCurrFrame.rows, (double)myBox.height)));
+//        int regionSizeW =  std::max((double)myBox.width, std::min(myBox.width + round((myBox.width/1000)*dis(gen)), (double)oCurrFrame.cols-x));
+//        int regionSizeH =  std::max((double)myBox.height, std::min(myBox.height+ round((myBox.height/1000)*dis(gen)), (double)oCurrFrame.rows-y));
+//        boxes.push_back(cv::Rect(x, y, std::min((double)oCurrFrame.cols, (double)x+myBox.width), std::min((double)oCurrFrame.rows, (double)myBox.height)));
+        double regionSizeW = myBox.width + round((myBox.width/3)*dis(gen));
+        double regionSizeH = myBox.height + round((myBox.height/3)*dis(gen));
+        std::cout << "!!!!!!!" << x << " " << y << std::endl;
+        std::cout << "???????" << regionSizeH << " " << regionSizeW << std::endl;
+        x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
+        y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
+
+        boxes.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
     }
     //get frame from ref rect + compute histo
     cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
-    std::vector<int> ref_histo = getHistogram(myBoxFrame);
+//    std::vector<int> ref_histo = getHistogram(myBoxFrame);
     int mini_diff = 10000, mini_idx = -1;
+
     for(int i = 0; i < boxes.size(); ++i)
     {
+//        std::cout << "boxes size : " << boxes.size() << "   ->   " << i << std::endl;
+//        std::cout << "##   " << boxes.at(i).x << " " << boxes.at(i).y << " " << boxes.at(i).x + boxes.at(i).width << " " << boxes.at(i).y + boxes.at(i).height << std::endl;
+
+//        std::cout << oCurrFrame.rows << " " << oCurrFrame.cols << std::endl;
         cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(255,0,0));
-        std::vector<int> curr_histo = getHistogram(oCurrFrame(boxes.at(i)));
-        if(int res = abs(getDistanceHistogram(ref_histo, curr_histo)) < mini_diff)
-        {
-            mini_idx = i;
-            mini_diff = res;
-        }
+//        std::vector<int> curr_histo = getHistogram(oCurrFrame(boxes.at(i)));
+//        std::cout << "YUTYUTYUTYUTY" << std::endl;
+//        std::cout << "after getHistogramm" << std::endl;
+//        if(int res = abs(getDistanceHistogram(ref_histo, curr_histo)) < mini_diff)
+//        {
+//            mini_idx = i;
+//            mini_diff = res;
+//        }
     }
-    std::cout << mini_idx << std::endl;
-    std::cout << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.height << std::endl;
-    myBox = boxes.at(mini_idx);
-    std::cout << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.height << std::endl;
+//    std::cout << mini_idx << std::endl;
+//    std::cout << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.height << std::endl;
+//    std::cout << "!!!!!! " << mini_diff << std::endl;
+//    myBox = boxes.at(mini_idx);
+//    std::cout << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.height << std::endl;
     boxes.clear();
     oOutputBBox = myBox;
 
