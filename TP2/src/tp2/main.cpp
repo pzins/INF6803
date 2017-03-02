@@ -21,7 +21,6 @@ int main(int /*argc*/, char** /*argv*/) {
             CV_Assert(!sCurrGTLine.empty());
             std::cout << "Parsing input bounding box..." << std::endl;
             const cv::Rect oInitBBox = convertToRect(sCurrGTLine);
-            std::cout << oInitBBox.x << " " <<oInitBBox.y << std::endl;
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
 
@@ -35,6 +34,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::Rect oOutputBBox;
 
                 pAlgo->apply(oCurrFrame,oOutputBBox);
+                cv::waitKey();
 
                 std::getline(oGTFile,sCurrGTLine);
                 CV_Assert(!sCurrGTLine.empty());

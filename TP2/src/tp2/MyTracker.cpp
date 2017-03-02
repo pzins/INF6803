@@ -30,7 +30,7 @@ std::vector<int> getHistogram(const cv::Mat& frame){
 
     /// Generate grad_x and grad_y
     cv::Mat grad_x, grad_y;
-    cv::Mat abs_grad_x, abs_grad_y;
+    cv::Mat abs_grad_x, abs_grad_y, angles;
     /// Gradient X
 
     cv::Sobel( frame, grad_x, ddepth, 1, 0, 3, scale, delta, cv::BORDER_DEFAULT );
@@ -39,6 +39,11 @@ std::vector<int> getHistogram(const cv::Mat& frame){
     /// Gradient Y
     cv::Sobel( frame, grad_y, ddepth, 0, 1, 3, scale, delta, cv::BORDER_DEFAULT );
     cv::convertScaleAbs( grad_y, abs_grad_y );
+
+//    std::cout << grad_x.size() << " " << grad_y.size() << std::endl;
+//    cv::phase(grad_x, grad_y, grad_x, true);
+//    std::cout << "ANGLES" << std::endl;
+//    std::cout << angles << std::endl;
 
     /// Total Gradient (approximate)
     cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, frame);
@@ -49,33 +54,49 @@ std::vector<int> getHistogram(const cv::Mat& frame){
             histo.at(static_cast<int>(angle)) += (int)frame.at<uint8_t>(i,j);
         }
     }
-    return histo;
+
+    //quantif gradient
+    std::vector<int> res;
+    for(int i = 0; i < 30; ++i)
+    {
+        double tmp = 0;
+        for(int j = 0; j < 12; ++j){
+            tmp += histo.at(i * 12 + j);
+        }
+        res.push_back(tmp);
+    }
+    return res;
 }
 
 void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 {
     myBox = oInitBBox; //mybox my rect tracker
+    std::cout << "MYBOX : " << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.y << std::endl;
 }
 
 
 int getDistanceHistogram(const std::vector<int>& refHist, const std::vector<int>& currHist){
-    double somme = 1;
+    double somme = 0;
+    double somme2 = 0;
     for(int i = 0; i < refHist.size(); ++i)
     {
         somme += sqrt(refHist.at(i) * currHist.at(i));
+        somme2 += abs(refHist.at(i) - currHist.at(i));
     }
-    std::cout << -log(somme) << std::endl;
-    return -log(somme);
+    return somme2;
+//    std::cout << "SOMME  =" << somme << std::endl;
+    //max to avoid log(0)
+    return -log(std::max(1.0,somme));
 }
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
-    int nbParticules = 10;
+    int nbParticules = 20;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(-0.5,0.5);
-    for(int i = 0; i < 10; ++i){
+    for(int i = 0; i < nbParticules-1; ++i){
         double x = myBox.x+round(2*myBox.width*dis(gen));
         double y = myBox.y+round(2*myBox.height*dis(gen));
 
@@ -86,16 +107,33 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
         boxes.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
     }
+    boxes.push_back(myBox);
+    std::cout << "PARTICULES : " << std::endl;
+    for(auto i : boxes)
+    {
+        std::cout << i.x << " " << i.y << " " << i.width << " " << i.height << std::endl;
+    }
     //get frame from ref rect + compute histo
     cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
     std::vector<int> ref_histo = getHistogram(myBoxFrame);
-    int mini_diff = 10000, mini_idx = -1;
+
+    std::cout << "Histo" << std::endl;
+    for(auto i : ref_histo)
+        std::cout << i << " ";
+
+    int mini_diff = 1000000000, mini_idx = 0;
 
     for(int i = 0; i < boxes.size(); ++i)
     {
         cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(0,0,255));
         std::vector<int> curr_histo = getHistogram(oCurrFrame(boxes.at(i)).clone());
-        int res = abs(getDistanceHistogram(ref_histo, curr_histo));
+
+        std::cout << std::endl << "other histo" << std::endl;
+        for(auto i : curr_histo)
+            std::cout << i << " ";
+        std::cout << std::endl;
+        int res = getDistanceHistogram(ref_histo, curr_histo);
+        std::cout << "RESULT :  "<< res << std::endl;
         if( res < mini_diff)
         {
             mini_idx = i;
@@ -103,6 +141,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         }
 
     }
+
     myBox = boxes.at(mini_idx);
     boxes.clear();
     oOutputBBox = myBox;
