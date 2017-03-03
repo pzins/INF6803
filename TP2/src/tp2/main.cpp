@@ -34,7 +34,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::Rect oOutputBBox;
 
                 pAlgo->apply(oCurrFrame,oOutputBBox);
-                cv::waitKey();
+//                cv::waitKey();
 
                 std::getline(oGTFile,sCurrGTLine);
                 CV_Assert(!sCurrGTLine.empty());
