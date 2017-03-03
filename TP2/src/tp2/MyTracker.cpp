@@ -84,10 +84,15 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 
 
 float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist){
-
+    cv::MatND hist(currHist);
+    cv::MatND hist2(refHist);
+    double dist_b = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
+//    std::cout << "BATTTA = " << dist_b << std::endl;
+    return dist_b;
     double res = 0;
     double denominator = 0;
     double somme = 0;
+
 //    for(int i = 0; i < refHist.size(); ++i)
 //        somme += fabs(refHist.at(i)-currHist.at(i));
 //    return somme;
@@ -96,6 +101,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     {
         somme += refHist.at(i)*currHist.at(i);
     }
+    std::cout << -log(somme) << std::endl;
     return -log(somme);
 
     for(int i = 0; i < refHist.size(); ++i)
@@ -109,7 +115,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
-    int nbParticules = 500;
+    int nbParticules = 100;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(-0.5,0.5);
@@ -134,7 +140,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         std::vector<float> curr_histo = getHistogram(oCurrFrame(boxes.at(i)).clone());
 
         float res = getDistanceHistogram(histogram, curr_histo);
-        std::cout << "res = " << res << std::endl;
+//        std::cout << "res = " << res << std::endl;
         if( res < mini_diff)
         {
             mini_idx = i;
@@ -143,7 +149,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         }
 
     }
-    std::cout << "mini = " << mini_idx << std::endl;
+//    std::cout << "mini = " << mini_idx << std::endl;
     myBox = boxes.at(mini_idx);
     boxes.clear();
     oOutputBBox = myBox;
@@ -153,8 +159,8 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 //    std::vector<int> ref_histo = getHistogram(myBoxFrame);
     histogram=tmp;
 
-    cv::waitKey(0);
-    usleep(1000);
+//    cv::waitKey(0);
+//    usleep(100);
 }
 
 //voir function normalize()
