@@ -1,14 +1,14 @@
 #include <tp2/common.hpp>
 #include <unistd.h>
+#define PI 3.14159265
 
 
 class MyTracker : public Tracker
 {
 private:
-    std::vector<int> histogram;
+    std::vector<float> histogram;
     cv::Rect myBox;
     std::vector<cv::Rect> boxes;
-    std::vector<int> pred_histo;
 public:
     void initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox);
     void apply(const cv::Mat& oCurrFrame, cv::Rect& oOutputBBox);
@@ -18,16 +18,16 @@ std::shared_ptr<Tracker> Tracker::createInstance(){
     return std::shared_ptr<Tracker>(new MyTracker());
 }
 
-std::vector<int> getHistogram(const cv::Mat& frame){
+std::vector<float> getHistogram(const cv::Mat& frame_){
 
     int ddepth = CV_16S;
     int scale = 1;
     int delta = 0;
 
-    cv::GaussianBlur( frame, frame, cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    cv::Mat frame;
 
-    /// Convert it to gray
-//    cvtColor( frame, frame, CV_BGR2GRAY );
+    cv::GaussianBlur(frame_, frame_, cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+    cvtColor( frame_, frame, CV_BGR2GRAY );
 
     /// Generate grad_x and grad_y
     cv::Mat grad_x, grad_y;
@@ -39,35 +39,39 @@ std::vector<int> getHistogram(const cv::Mat& frame){
     /// Gradient Y
     cv::Sobel( frame, grad_y, ddepth, 0, 1, 3, scale, delta, cv::BORDER_DEFAULT );
     cv::convertScaleAbs( grad_y, abs_grad_y );
-
-//    std::cout << grad_x.size() << " " << grad_y.size() << std::endl;
-//    cv::phase(grad_x, grad_y, grad_x, true);
-//    std::cout << "ANGLES" << std::endl;
-//    std::cout << angles << std::endl;
-
-//    cv::Mat angles(grad_x), mag(grad_x);
-//    cv::cartToPolar(grad_x, grad_y, angles, mag, true);
+//    std::cout << grad_y << std::endl;
 
     /// Total Gradient (approximate)
     cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, frame);
-    std::vector<int> histo(360,0);
+
+    std::vector<float> histo(360,0);
+    double sum_gradient = cv::sum(frame)[0];
+
     for(int i = 0; i < frame.rows; ++i){
         for(int j = 0; j < frame.cols; ++j){
-            float angle = cv::fastAtan2(grad_x.at<uint8_t>(i,j), grad_y.at<uchar>(i,j));
-            histo.at(static_cast<int>(angle)) += (int)frame.at<uint8_t>(i,j);
+            float angle = atan2((float)grad_y.at<int>(i,j), (float)grad_x.at<int>(i,j)) * 180 / PI;
+            if(angle<0)
+            {
+                angle = 180 + (180 + angle)-1;
+            }
+            histo.at(static_cast<int>(angle)) += frame.at<uint8_t>(i,j) / sum_gradient;
         }
     }
-    return histo;
+//    cv::waitKey();
+//    usleep(100000);
     //quantif gradient
-    std::vector<int> res;
-    for(int i = 0; i < 60; ++i)
+    std::vector<float> res;
+    for(int i = 0; i < 15; ++i)
     {
         double tmp = 0;
-        for(int j = 0; j < 6; ++j){
-            tmp += histo.at(i * 6 + j);
+        for(int j = 0; j < 24; ++j){
+            tmp += histo.at(i * 24 + j);
         }
         res.push_back(tmp);
     }
+//    for(auto i : res)
+//        std::cout << i << " ";
+//   std::cout<<std::endl;
     return res;
 }
 
@@ -75,30 +79,37 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 {
     myBox = oInitBBox; //mybox my rect tracker
     cv::Mat myBoxFrame = oInitFrame(myBox).clone();
-    pred_histo = getHistogram(myBoxFrame);
-    std::cout << "MYBOX : " << myBox.x << " " << myBox.y << " " << myBox.width << " " << myBox.y << std::endl;
+    histogram = getHistogram(myBoxFrame);
 }
 
 
-int getDistanceHistogram(const std::vector<int>& refHist, const std::vector<int>& currHist){
+float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist){
 
+    double res = 0;
+    double denominator = 0;
     double somme = 0;
-    double somme2 = 0;
+//    for(int i = 0; i < refHist.size(); ++i)
+//        somme += fabs(refHist.at(i)-currHist.at(i));
+//    return somme;
+
     for(int i = 0; i < refHist.size(); ++i)
     {
-        somme += sqrt(refHist.at(i) * currHist.at(i));
-        somme2 += abs(refHist.at(i) - currHist.at(i));
+        somme += refHist.at(i)*currHist.at(i);
     }
-    return somme2;
-//    std::cout << "SOMME  =" << somme << std::endl;
-    //max to avoid log(0)
-    return -log(std::max(1.0,somme));
+    return -log(somme);
+
+    for(int i = 0; i < refHist.size(); ++i)
+        denominator += refHist.at(i) * currHist.at(i);
+    for(int i = 0; i < refHist.size(); ++i)
+        res += sqrt(refHist.at(i)*currHist.at(i)) / sqrt(denominator);
+
+    return sqrt(1-res);
 }
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
-    int nbParticules = 15;
+    int nbParticules = 500;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(-0.5,0.5);
@@ -114,47 +125,36 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         boxes.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
     }
     boxes.push_back(myBox);
-//    std::cout << "PARTICULES : " << std::endl;
-//    for(auto i : boxes)
-//        std::cout << i.x << " " << i.y << " " << i.width << " " << i.height << std::endl;
 
-
-
-//    std::cout << "Histo" << std::endl;
-//    for(auto i : ref_histo)
-//        std::cout << i << " ";
-//    std::cout << std::endl;
-//    cv::waitKey();
-
-    int mini_diff = 1000000000, mini_idx = 0;
-
+    float mini_diff = 1000, mini_idx = 0;
+    std::vector<float> tmp;
     for(int i = 0; i < boxes.size(); ++i)
     {
 //        cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(0,0,255));
-        std::vector<int> curr_histo = getHistogram(oCurrFrame(boxes.at(i)).clone());
+        std::vector<float> curr_histo = getHistogram(oCurrFrame(boxes.at(i)).clone());
 
-//        std::cout << std::endl << "other histo" << std::endl;
-//        for(auto i : curr_histo)
-//            std::cout << i << " ";
-//        std::cout << std::endl;
-        int res = getDistanceHistogram(pred_histo, curr_histo);
-//        std::cout << "RESULT :  " << i << " => " << res << std::endl;
+        float res = getDistanceHistogram(histogram, curr_histo);
+        std::cout << "res = " << res << std::endl;
         if( res < mini_diff)
         {
             mini_idx = i;
             mini_diff = res;
+            tmp=curr_histo;
         }
 
     }
-    std::cout << "MINI = " << mini_idx << std::endl;
+    std::cout << "mini = " << mini_idx << std::endl;
     myBox = boxes.at(mini_idx);
     boxes.clear();
     oOutputBBox = myBox;
 
     //get frame from ref rect + compute histo
-    cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
-    std::vector<int> ref_histo = getHistogram(myBoxFrame);
-//    usleep(100000);
+//    cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
+//    std::vector<int> ref_histo = getHistogram(myBoxFrame);
+    histogram=tmp;
+
+    cv::waitKey(0);
+    usleep(1000);
 }
 
 //voir function normalize()

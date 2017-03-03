@@ -1,4 +1,3 @@
-
 #include "tp2/common.hpp"
 
 int main(int /*argc*/, char** /*argv*/) {
