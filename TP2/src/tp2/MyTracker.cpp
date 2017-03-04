@@ -1,6 +1,7 @@
 #include <tp2/common.hpp>
 #include <unistd.h>
 #define PI 3.14159265
+#define NB_PARTICULES 10
 
 
 class MyTracker : public Tracker
@@ -8,7 +9,7 @@ class MyTracker : public Tracker
 private:
     std::vector<float> histogram;
     cv::Rect myBox;
-    std::vector<cv::Rect> boxes;
+    std::vector<cv::Rect> particules;
 public:
     void initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox);
     void apply(const cv::Mat& oCurrFrame, cv::Rect& oOutputBBox);
@@ -80,6 +81,21 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
     myBox = oInitBBox; //mybox my rect tracker
     cv::Mat myBoxFrame = oInitFrame(myBox).clone();
     histogram = getHistogram(myBoxFrame);
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-0.5,0.5);
+    for(int i = 0; i < NB_PARTICULES-1; ++i){
+        double x = myBox.x+round(2*myBox.width*dis(gen));
+        double y = myBox.y+round(2*myBox.height*dis(gen));
+        double regionSizeW = myBox.width + round((myBox.width/3)*dis(gen));
+        double regionSizeH = myBox.height + round((myBox.height/3)*dis(gen));
+        x = std::max(0.0, std::min(x, oInitFrame.cols-regionSizeW));
+        y = std::max(0.0, std::min(y, oInitFrame.rows-regionSizeH));
+
+        particules.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
+    }
+    particules.push_back(myBox);
 }
 
 
@@ -115,43 +131,97 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
-    int nbParticules = 100;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(-0.5,0.5);
-    for(int i = 0; i < nbParticules-1; ++i){
-        double x = myBox.x+round(2*myBox.width*dis(gen));
-        double y = myBox.y+round(2*myBox.height*dis(gen));
+//    std::random_device rd;
+//    std::mt19937 gen(rd());
+//    std::uniform_real_distribution<> dis(-0.5,0.5);
+//    for(int i = 0; i < nbParticules-1; ++i){
+//        double x = myBox.x+round(2*myBox.width*dis(gen));
+//        double y = myBox.y+round(2*myBox.height*dis(gen));
+//        double regionSizeW = myBox.width + round((myBox.width/3)*dis(gen));
+//        double regionSizeH = myBox.height + round((myBox.height/3)*dis(gen));
+//        x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
+//        y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
 
-        double regionSizeW = myBox.width + round((myBox.width/3)*dis(gen));
-        double regionSizeH = myBox.height + round((myBox.height/3)*dis(gen));
-        x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
-        y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
-
-        boxes.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
-    }
-    boxes.push_back(myBox);
-
+//        particules.push_back(cv::Rect(x,y,regionSizeW, regionSizeH));
+//    }
+//    particules.push_back(myBox);
     float mini_diff = 1000, mini_idx = 0;
     std::vector<float> tmp;
-    for(int i = 0; i < boxes.size(); ++i)
+    std::vector<std::tuple<int,float>> best_particules;
+    float sum_part_similarity = 0;
+    for(int i = 0; i < particules.size(); ++i)
     {
 //        cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(0,0,255));
-        std::vector<float> curr_histo = getHistogram(oCurrFrame(boxes.at(i)).clone());
+        std::vector<float> curr_histo = getHistogram(oCurrFrame(particules.at(i)).clone());
 
         float res = getDistanceHistogram(histogram, curr_histo);
-//        std::cout << "res = " << res << std::endl;
+        sum_part_similarity += res;
         if( res < mini_diff)
         {
             mini_idx = i;
             mini_diff = res;
             tmp=curr_histo;
         }
+        best_particules.push_back(std::make_tuple(i, res));
+
 
     }
-//    std::cout << "mini = " << mini_idx << std::endl;
-    myBox = boxes.at(mini_idx);
-    boxes.clear();
+    std::vector<cv::Rect> newParticules;
+    float it = 0;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(0,1);
+    float rand = dis(gen);
+    for(int i = 0; i < best_particules.size(); ++i)
+    {
+        it += std::get<1>(best_particules.at(i)) / sum_part_similarity;
+        if(it >= rand)
+            newParticules.push_back(particules.at(std::get<0>(best_particules.at(i))));
+    }
+    for(int i = 0; i < particules.size(); ++i)
+    {
+        double x = newParticules.at(i).x+round(2*newParticules.at(i).width*dis(gen));
+        double y = newParticules.at(i).y+round(2*newParticules.at(i).height*dis(gen));
+        double regionSizeW = newParticules.at(i).width + round((newParticules.at(i).width/3)*dis(gen));
+        double regionSizeH = newParticules.at(i).height + round((newParticules.at(i).height/3)*dis(gen));
+        x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
+        y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
+        particules.at(i) = cv::Rect(x, y, regionSizeW, regionSizeH);
+    }
+
+    std::sort(
+        best_particules.begin(), best_particules.end(),
+        [](std::tuple<int, float> a, std::tuple<int, float> b) {
+            return std::get<1>(a) < std::get<1>(b);
+        }
+    );
+//    for(auto i : best_particules)
+//        std::cout << "(" << std::get<0>(i) << "/" << std::get<1>(i) << ") ";
+//    std::cout << std::endl;
+    std::cout << "mini = " << mini_idx << std::endl;
+
+
+
+    //compute coo new box
+    int nb_best = 25;
+    float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
+    for(int i = 0; i < nb_best; ++i)
+    {
+        x_ += particules.at(std::get<0>(best_particules.at(i))).x;
+        y_ += particules.at(std::get<0>(best_particules.at(i))).y;
+        w_ += particules.at(std::get<0>(best_particules.at(i))).size().width;
+        h_ += particules.at(std::get<0>(best_particules.at(i))).size().height;
+    }
+    x_ /= nb_best;
+    y_ /= nb_best;
+    w_ /= nb_best;
+    h_ /= nb_best;
+
+
+
+//    myBox = boxes.at(mini_idx);
+    myBox = cv::Rect(x_, y_, w_, h_);
+    particules.clear();
     oOutputBBox = myBox;
 
     //get frame from ref rect + compute histo
