@@ -7,10 +7,10 @@
 #include "opencv2/objdetect/objdetect.hpp"
 
 #define PI 3.14159265
-#define NB_PARTICULES 100
-#define ANGLE_DIVISION 15 //better if it divides 360
-#define BAG_SIZE 100000
-#define NB_BEST_PARTICULES_BOX_COO 69 //number of best particules to compute new box coordinate
+#define NB_PARTICULES 50
+#define ANGLE_DIVISION 15 //should divide 360
+#define BAG_SIZE 1000
+#define NB_BEST_PARTICULES_BOX_COO 25 //number of best particules to compute new box coordinate
 
 class Particule
 {
@@ -19,15 +19,32 @@ private:
     double distanceHOG;
     cv::Rect shape;
 public:
-    Particule(cv::Rect rec) : shape(rec){}
+    Particule(cv::Rect rec) : shape(rec), distance(0), distanceHOG(0) {}
     cv::Rect& getShape(){return shape;}
+    void setShape(const cv::Rect& rec){shape = rec;}
+    void setHOGDistance(double value){distanceHOG = value;}
+    void setDistance(double value){distance = value;}
+    double getHOGDistance() const {return distanceHOG;}
+    double getDistance() const {return distance;}
+
+    //choose between distance, HOG_distance, distance + HOG_distance
+    bool operator< (const Particule& other) const {
+        return distance < other.distance;
+        return distanceHOG< other.distanceHOG;
+        return distanceHOG+distance < other.distanceHOG+other.distance;
+    }
+    double getTotalDistance() const{
+        return getDistance();
+        return getHOGDistance();
+        return getHOGDistance()+getDistance();
+    }
 };
 std::ostream& operator<<(std::ostream& os, Particule& obj)
 {
-    // write obj to stream
     os << obj.getShape();
     return os;
 }
+
 
 class MyTracker : public Tracker
 {
@@ -42,39 +59,48 @@ public:
     void printParticules();
 };
 
-std::vector<float> getHOGDescriptor(const cv::Mat& mat){
+
+
+std::shared_ptr<Tracker> Tracker::createInstance(){
+    return std::shared_ptr<Tracker>(new MyTracker());
+}
+
+void MyTracker::printParticules(){
+    std::cout << "----------------------------------" << std::endl;
+    for(auto i : particules)
+        std::cout << i << " ";
+    std::cout << std::endl;
+    std::cout << "----------------------------------" << std::endl;
+}
+
+
+std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
     cv::HOGDescriptor d(cv::Size(16,16), cv::Size(16,16), cv::Size(16,16), cv::Size(8,8),9);
     std::vector<float> desc;
-    d.compute(mat.clone(), desc);
+    d.compute(frame_.clone(), desc);
 //    std::cout << desc.size() << std::endl;
 //    for(auto i : desc)
 //        std::cout << i << " ";
 //    std::cout << std::endl;
     return desc;
 }
-
-std::shared_ptr<Tracker> Tracker::createInstance(){
-    return std::shared_ptr<Tracker>(new MyTracker());
-}
-
 std::vector<float> getHistogram(const cv::Mat& frame_){
     int ddepth = CV_16S;
     int scale = 1;
     int delta = 0;
 
-    cv::Mat frame;
+    cv::Mat frame = frame_.clone();
 
-//    cv::GaussianBlur(frame_, frame_, cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
     cvtColor( frame_, frame, CV_BGR2GRAY );
     /// Generate grad_x and grad_y
     cv::Mat grad_x, grad_y;
     cv::Mat abs_grad_x, abs_grad_y;
     /// Gradient X
-    cv::Sobel( frame, grad_x, ddepth, 1, 0, 3, scale, delta, cv::BORDER_DEFAULT );
+    cv::Sobel( frame, grad_x, ddepth, 1, 0, 1, scale, delta, cv::BORDER_DEFAULT );
     cv::convertScaleAbs( grad_x, abs_grad_x );
 
     /// Gradient Y
-    cv::Sobel( frame, grad_y, ddepth, 0, 1, 3, scale, delta, cv::BORDER_DEFAULT );
+    cv::Sobel( frame, grad_y, ddepth, 0, 1, 1, scale, delta, cv::BORDER_DEFAULT );
     cv::convertScaleAbs( grad_y, abs_grad_y );
 
     /// Total Gradient (approximate)
@@ -106,17 +132,20 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
     return res;
 }
 
-void MyTracker::printParticules(){
-    std::cout << "----------------------------------" << std::endl;
-    for(auto i : particules)
-        std::cout << i << " ";
-    std::cout << std::endl;
-    std::cout << "----------------------------------" << std::endl;
+
+double getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist){
+    cv::MatND hist(currHist);
+    cv::MatND hist2(refHist);
+    // reutrn Bhattacharyya distance
+    // max with very small number to prevent very small value which cause infintie number later
+    double ret = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
+    if(ret<0.0001) std::cout << ret << std::endl;
+    return std::max(0.000001,ret);
 }
+
 
 void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 {
-
     particules.clear();
 
     //init myBox and the associated histogram
@@ -142,34 +171,26 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 }
 
 
-double getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist){
-    cv::MatND hist(currHist);
-    cv::MatND hist2(refHist);
-    // get Bhattacharyya distance
-    return cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
-}
-
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
-
-
-    std::vector<std::tuple<int,float>> particules_index_distance;
     double sum_particule_distance = 0;
     for(int i = 0; i < particules.size(); ++i)
     {
         //print particules (!! affect gradient computation)
-//        cv::rectangle(oCurrFrame, cv::Point(particules.at(i).x, particules.at(i).y), cv::Point(particules.at(i).x+particules.at(i).size().width,particules.at(i).y+particules.at(i).size().height), cv::Scalar(0,0,255));
+//        cv::rectangle(oCurrFrame, cv::Point(particules.at(i).getShape().x, particules.at(i).getShape().y),
+//                      cv::Point(particules.at(i).getShape().x+particules.at(i).getShape().size().width,
+//                                particules.at(i).getShape().y+particules.at(i).getShape().size().height), cv::Scalar(255,255,255));
 
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
         double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape()).clone()));
-        res = getDistanceHistogram(HOGhistogram, getHOGDescriptor(oCurrFrame(particules.at(i).getShape())));
+        particules.at(i).setDistance(res);
+        double resHOG = getDistanceHistogram(HOGhistogram, getHOGDescriptor(oCurrFrame(particules.at(i).getShape())));
+        particules.at(i).setHOGDistance(resHOG);
+
         // get the total distance
         sum_particule_distance += res;
-        // save tuple (particules index, distance)
-
-        particules_index_distance.push_back(std::make_tuple(i, res));
     }
 
     //simulation tirage avec remise
@@ -177,15 +198,16 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     std::vector<cv::Rect> newParticules;
     // get normalisation value (low distance == high similarity => more probabilty to be chosen)
     double sum_norm = 0;
-    for(auto i : particules_index_distance)
-        sum_norm += (1/(std::get<1>(i) / sum_particule_distance));
+    for(auto i : particules)
+        sum_norm += (1/(i.getTotalDistance() / sum_particule_distance));
     std::vector<int> bag;
+
     // fill bag with particules according to their probability (proportional to the distance)
-    for(int i = 0; i < particules_index_distance.size(); ++i)
+    for(int i = 0; i < particules.size(); ++i)
     {
-        float proba = (1/(std::get<1>(particules_index_distance.at(i)) / sum_particule_distance))/sum_norm;
+        float proba = (1/(particules.at(i).getTotalDistance() / sum_particule_distance))/sum_norm;
         for(int j = 0; j < proba * BAG_SIZE; ++j)
-            bag.push_back(std::get<0>(particules_index_distance.at(i)));
+            bag.push_back(i);
     }
 
     // shuffle sac
@@ -195,21 +217,16 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     for(int j = 0; j < NB_PARTICULES; ++j)
         newParticules.push_back(particules.at(bag.at(rand() % bag.size())).getShape());
 
-    // sort particules_index_distance according to the distance
-    std::sort(
-        particules_index_distance.begin(), particules_index_distance.end(),
-        [](std::tuple<int, float> a, std::tuple<int, float> b) {
-            return std::get<1>(a) < std::get<1>(b);
-        }
-    );
+    std::sort(particules.begin(), particules.end());
+
     //compute coordinate of the new box
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     for(int i = 0; i < NB_BEST_PARTICULES_BOX_COO; ++i)
     {
-        x_ += particules.at(std::get<0>(particules_index_distance.at(i))).getShape().x;
-        y_ += particules.at(std::get<0>(particules_index_distance.at(i))).getShape().y;
-        w_ += particules.at(std::get<0>(particules_index_distance.at(i))).getShape().size().width;
-        h_ += particules.at(std::get<0>(particules_index_distance.at(i))).getShape().size().height;
+        x_ += particules.at(i).getShape().x;
+        y_ += particules.at(i).getShape().y;
+        w_ += particules.at(i).getShape().size().width;
+        h_ += particules.at(i).getShape().size().height;
     }
     //mean
     x_ /= NB_BEST_PARTICULES_BOX_COO;
@@ -235,7 +252,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, newParticules.at(i).height + 0*round((newParticules.at(i).height/20)*dis(gen))));
         x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
         y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
-        particules.at(i) = cv::Rect(x, y, regionSizeW, regionSizeH);
+        particules.at(i).setShape(cv::Rect(x, y, regionSizeW, regionSizeH));
     }
 
 
