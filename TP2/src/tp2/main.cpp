@@ -48,7 +48,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::imshow("display",oDisplayFrame);
                 cv::waitKey(1);
 //                int a;std::cin>>a;
-                usleep(1000000);
+//                usleep(100œ000);
 //                usleep(5000000);
 
             }
