@@ -1,4 +1,5 @@
 #include "tp2/common.hpp"
+#include <unistd.h>
 
 int main(int /*argc*/, char** /*argv*/) {
     try {
@@ -33,7 +34,6 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::Rect oOutputBBox;
 
                 pAlgo->apply(oCurrFrame,oOutputBBox);
-//                cv::waitKey();
 
                 std::getline(oGTFile,sCurrGTLine);
                 CV_Assert(!sCurrGTLine.empty());
@@ -47,6 +47,10 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::rectangle(oDisplayFrame,oGTBBox.tl(),oGTBBox.br(),cv::Scalar_<uchar>(0,255,0),2); // target box = green
                 cv::imshow("display",oDisplayFrame);
                 cv::waitKey(1);
+//                int a;std::cin>>a;
+                usleep(1000000);
+//                usleep(5000000);
+
             }
 
             // @@@@ TODO : compute average CLE/OR measure for current sequence here

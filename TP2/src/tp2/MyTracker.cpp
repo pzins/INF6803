@@ -131,6 +131,14 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
+//    std::cout << "----------------------------------" << std::endl;
+//    for(auto i : particules)
+//        std::cout << i << " ";
+//    std::cout << std::endl;
+//    std::cout << "----------------------------------" << std::endl;
+
+
+
 //    std::random_device rd;
 //    std::mt19937 gen(rd());
 //    std::uniform_real_distribution<> dis(-0.5,0.5);
@@ -151,7 +159,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     float sum_part_similarity = 0;
     for(int i = 0; i < particules.size(); ++i)
     {
-//        cv::rectangle(oCurrFrame, cv::Point(boxes.at(i).x, boxes.at(i).y), cv::Point(boxes.at(i).x+boxes.at(i).size().width, boxes.at(i).y+boxes.at(i).size().height), cv::Scalar(0,0,255));
+//        cv::rectangle(oCurrFrame, cv::Point(particules.at(i).x, particules.at(i).y), cv::Point(particules.at(i).x+particules.at(i).size().height,particules.at(i).y+particules.at(i).size().width), cv::Scalar(0,0,255));
         std::vector<float> curr_histo = getHistogram(oCurrFrame(particules.at(i)).clone());
 
         float res = getDistanceHistogram(histogram, curr_histo);
@@ -163,8 +171,6 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
             tmp=curr_histo;
         }
         particules_idx_simi.push_back(std::make_tuple(i, res));
-
-
     }
 
     //simulation tirage avec remise
@@ -172,16 +178,21 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0,1);
-    //random nb between 0 and 1
-    for(int j = 0; j < particules_idx_simi.size(); ++j)
+    for(int j = 0; j < NB_PARTICULES-1; ++j)
     {
         float rand = dis(gen);
         float it = 0;
-        for(int i = 0; i < particules.size(); ++i)
+        for(int i = 0; i < particules_idx_simi.size(); ++i)
         {
             it += std::get<1>(particules_idx_simi.at(i)) / sum_part_similarity;
             if(it >= rand){
                 newParticules.push_back(particules.at(std::get<0>(particules_idx_simi.at(i))));
+//                std::cout << std::get<0>(particules_idx_simi.at(i)) << std::endl;
+//                cv::rectangle(oCurrFrame, cv::Point(particules.at(std::get<0>(particules_idx_simi.at(i))).x,
+//                                                    particules.at(std::get<0>(particules_idx_simi.at(i))).y),
+//                              cv::Point(particules.at(std::get<0>(particules_idx_simi.at(i))).x+particules.at(std::get<0>(particules_idx_simi.at(i))).size().height,
+//                                        particules.at(std::get<0>(particules_idx_simi.at(i))).y+particules.at(std::get<0>(particules_idx_simi.at(i))).size().width), cv::Scalar(0,255,0));
+
                 break;
             }
         }
@@ -196,7 +207,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
     //compute coo new box
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
-    int nb_best_particules =  3;
+    int nb_best_particules =  5;
     for(int i = 0; i < nb_best_particules; ++i)
     {
         x_ += particules.at(std::get<0>(particules_idx_simi.at(i))).x;
@@ -210,12 +221,11 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     h_ /= nb_best_particules;
 
 
-//    myBox = boxes.at(mini_idx);
     myBox = cv::Rect(x_, y_, w_, h_);
-//    particules.clear();
-    // get new particules
+
+    // set new particules
     std::uniform_real_distribution<> diss(-0.5,0.5);
-    for(int i = 0; i < particules.size(); ++i)
+    for(int i = 0; i < newParticules.size()-1; ++i)
     {
         double x = newParticules.at(i).x+round(2*newParticules.at(i).width*diss(gen));
         double y = newParticules.at(i).y+round(2*newParticules.at(i).height*diss(gen));
@@ -223,20 +233,20 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
         double regionSizeH = newParticules.at(i).height + round((newParticules.at(i).height/3)*diss(gen));
         x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
         y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
-        particules.at(i) = cv::Rect(x, y, regionSizeW, regionSizeH);
+        particules.at(i) = cv::Rect(x*0.5, y*0.5, regionSizeW, regionSizeH);
     }
-
+    particules.at(newParticules.size()) = myBox;
+//    std::cout << "----------------------------------" << std::endl;
+//    for(auto i : particules)
+//        std::cout << i << " ";
+//    std::cout << std::endl;
+//    std::cout << "----------------------------------" << std::endl;
     oOutputBBox = myBox;
-    std::cout << oOutputBBox << std::endl;
 
-    //get frame from ref rect + compute histo
-//    cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
-//    std::vector<int> ref_histo = getHistogram(myBoxFrame);
-    histogram=tmp;
+    cv::Mat myBoxFrame = oCurrFrame(myBox).clone();
+    histogram=getHistogram(myBoxFrame);
 
-//    cv::waitKey(0);
-
-//    usleep(100);
+//    usleep(100000);
 }
 
 //voir function normalize()
