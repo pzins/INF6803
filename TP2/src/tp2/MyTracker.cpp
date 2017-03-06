@@ -32,7 +32,7 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
 
     cv::Mat frame;
 
-    cv::GaussianBlur(frame_, frame_, cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
+//    cv::GaussianBlur(frame_, frame_, cv::Size(3,3), 0, 0, cv::BORDER_DEFAULT );
     cvtColor( frame_, frame, CV_BGR2GRAY );
     /// Generate grad_x and grad_y
     cv::Mat grad_x, grad_y;

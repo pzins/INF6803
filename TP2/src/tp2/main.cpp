@@ -17,18 +17,17 @@ float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
     return sqrt(pow(ref.x - myRect.x,2)+pow(ref.y - myRect.y,2));
 }
 
-float computeOR(const cv::Rect& ref, cv::Rect& myRect)
+double computeOR(const cv::Rect& ref, cv::Rect& myRect)
 {
     cv::Point hg(std::max(ref.x, myRect.x), std::max(ref.y, myRect.y));
     cv::Point bd(std::min(ref.x+ref.width, myRect.x+myRect.width), std::min(ref.y+ref.height, myRect.y+myRect.height));
-    return (abs(bd.x-hg.x)*abs(bd.y-hg.y))/(ref.width*ref.height);
+    double res = abs(bd.x-hg.x)*abs(bd.y-hg.y);
+    return res/(ref.width*ref.height+myRect.width*myRect.height-res);
 }
 
 int main(int /*argc*/, char** /*argv*/) {
     try {
-        int nbFrames = 0;
-        int nbFramesGood = 0;
-        double meanCLE = 0, meanOR = 0;
+
 
          std::shared_ptr<Tracker> pAlgo = Tracker::createInstance();
 
@@ -49,6 +48,11 @@ int main(int /*argc*/, char** /*argv*/) {
             const cv::Rect oInitBBox = convertToRect(sCurrGTLine);
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
+            int nbFrames = 0;
+            int nbFramesGood = 0;
+            double meanCLE = 0, meanOR = 0;
+            int decrochage = 0;
+
 
             pAlgo->initialize(oInitFrame, oInitBBox);
 
@@ -66,12 +70,16 @@ int main(int /*argc*/, char** /*argv*/) {
                 const cv::Rect oGTBBox = convertToRect(sCurrGTLine);
 
                 // @@@@@ TODO : compute CLE/OR with oGTBBox and oOutputBBox here*
-                if(isTrackingGood(oGTBBox, oOutputBBox))
-                    nbFramesGood++;
                 ++nbFrames;
+                if(isTrackingGood(oGTBBox, oOutputBBox))
+                {
+                    nbFramesGood++;
+                    if(nbFrames == nbFramesGood)
+                        decrochage++;
+                }
                 meanCLE += computeCLE(oGTBBox, oOutputBBox);
-                meanOR += computeOR(oGTBBox, oOutputBBox);
-                cv::waitKey();
+                double tmp = computeOR(oGTBBox, oOutputBBox);
+                meanOR += tmp;
 
                 // for display purposes only
                 cv::Mat oDisplayFrame = oCurrFrame.clone();
@@ -87,6 +95,7 @@ int main(int /*argc*/, char** /*argv*/) {
             std::cout << "Mean CLE : " << meanCLE / nbFrames << std::endl;
             std::cout << "Mean OR : " << meanOR / nbFrames<< std::endl;
             std::cout << "Suivi Algo : " << nbFramesGood << "/" << nbFrames << std::endl;
+            std::cout << "NB frame avant decrochage : " << decrochage << "/" << nbFrames << std::endl;
             // @@@@ TODO : compute average CLE/OR measure for current sequence here
 
         }
