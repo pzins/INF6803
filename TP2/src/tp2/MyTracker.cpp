@@ -51,6 +51,8 @@ class MyTracker : public Tracker
 private:
     std::vector<float> histogram;
     std::vector<float> HOGhistogram;
+
+    //histogram initial comme reference pour ajouter des distances basées sur les comparaisons avec ceux là
     std::vector<float> histogram_ref;
     std::vector<float> HOGhistogram_ref;
     cv::Rect myBox;
@@ -155,6 +157,7 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
     histogram_ref = histogram;
     HOGhistogram = getHOGDescriptor(oInitFrame(myBox));
     HOGhistogram_ref = HOGhistogram;
+
     //create particules from myBox
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -174,7 +177,6 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 
 
 
-//test if dist == 0 change et directement setter la particules
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
@@ -215,7 +217,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
             bag.push_back(i);
     }
 
-    // shuffle sac
+    // shuffle bag
     auto engine = std::default_random_engine{};
     std::shuffle(std::begin(bag), std::end(bag), engine);
     //tirage
