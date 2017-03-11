@@ -1,20 +1,25 @@
 #include "tp2/common.hpp"
 #include <unistd.h>
 
-
+#define THRESHOLD_TRACKING_GOOD_POS 50
+#define THRESHOLD_TRACKING_GOOD_SIZE 50
 
 bool isTrackingGood(const cv::Rect& ref, cv::Rect& myRect)
 {
-    if(abs(ref.x-myRect.x) > 50) return false;
-    if(abs(ref.y-myRect.y) > 50) return false;
-    if(abs(ref.width-myRect.width) > 100) return false;
-    if(abs(ref.height-myRect.height) > 100) return false;
+    if(abs(ref.x-myRect.x) > THRESHOLD_TRACKING_GOOD_POS) return false;
+    if(abs(ref.y-myRect.y) > THRESHOLD_TRACKING_GOOD_POS) return false;
+    if(abs(ref.width-myRect.width) > THRESHOLD_TRACKING_GOOD_SIZE) return false;
+    if(abs(ref.height-myRect.height) > THRESHOLD_TRACKING_GOOD_SIZE) return false;
     return true;
 }
 
 float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 {
-    return sqrt(pow(ref.x - myRect.x,2)+pow(ref.y - myRect.y,2));
+    float centerX1 = ref.x + ref.width / 2;
+    float centerY1 = ref.y + ref.height / 2;
+    float centerX2 = myRect.x + myRect.width / 2;
+    float centerY2 = myRect.y + myRect.height / 2;
+    return sqrt(pow(centerX1 - centerX2, 2)+pow(centerY1 - centerY2, 2));
 }
 
 double computeOR(const cv::Rect& ref, cv::Rect& myRect)
@@ -25,9 +30,9 @@ double computeOR(const cv::Rect& ref, cv::Rect& myRect)
     return res/(ref.width*ref.height+myRect.width*myRect.height-res);
 }
 
+
 int main(int /*argc*/, char** /*argv*/) {
     try {
-
 
          std::shared_ptr<Tracker> pAlgo = Tracker::createInstance();
 
