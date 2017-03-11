@@ -95,6 +95,7 @@ int main(int /*argc*/, char** /*argv*/) {
 //                int a;std::cin>>a;
 //                usleep(100œ000);
 //                usleep(5000000);
+//                cv::waitKey(0);
 
             }
             std::cout << "Mean CLE : " << meanCLE / nbFrames << std::endl;
