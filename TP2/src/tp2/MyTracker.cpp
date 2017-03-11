@@ -8,7 +8,7 @@
 #include <set>
 
 #define PI 3.14159265
-#define NB_PARTICULES 40
+#define NB_PARTICULES 50
 #define ANGLE_DIVISION 15 //should divide 360
 #define NB_BEST_PARTICULES 2 //number of best particules to compute new box coordinate
 #define RANDOM_RANGE 0.5
@@ -151,6 +151,15 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
 
 float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist)
 {
+    //L2 distance
+    double num = 0, deno=0;
+    for(int i = 0; i < refHist.size(); ++i)
+    {
+        num += pow(refHist.at(i)-currHist.at(i),2);
+        deno += refHist.at(i) + currHist.at(i);
+    }
+    return num / deno;
+
     //Bhattacharyya distance
     cv::MatND hist(currHist);
     cv::MatND hist2(refHist);
@@ -163,14 +172,6 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
         somme += sqrt(currHist.at(i) * currHist.at(i));
     return -log(somme);
 
-    //L2 distance
-    double num = 0, deno=0;
-    for(int i = 0; i < refHist.size(); ++i)
-    {
-        num += pow(refHist.at(i)-currHist.at(i),2);
-        deno += refHist.at(i) + currHist.at(i);
-    }
-    return num / deno;
 
 }
 
@@ -211,17 +212,17 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 //    double y = particule.y+ rand()%11 - 5;
 
     //version cours
-    double x = particule.x+ round(particule.width*dis(gen));
-    double y = particule.y+ round(particule.height*dis(gen));
+    double x = particule.x+ round(2*particule.width*dis(gen));
+    double y = particule.y+ round(2*particule.height*dis(gen));
 
     //size
     //version with +/- a few pixels
-    double regionSizeW = std::max(1, std::min(oCurrFrame.size().width, particule.width + (rand()%3 - 1)));
-    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height +(rand()%3 - 1)));
+//    double regionSizeW = std::max(1, std::min(oCurrFrame.size().width, particule.width + (rand()%11 - 5)));
+//    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height + (rand()%11 - 5)));
 
 //    version cours
-//    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + 0.01*round((particule.width/3)*dis(gen))));
-//    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + 0.01*round((particule.height/3)*dis(gen))));
+    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/9)*dis(gen))));
+    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/9)*dis(gen))));
 
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
@@ -246,7 +247,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
         double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
-        res += getDistanceHistogram(histogram_ref, getHistogram(oCurrFrame(particules.at(i).getShape())));
+//        res += getDistanceHistogram(histogram_ref, getHistogram(oCurrFrame(particules.at(i).getShape())));
         particules.at(i).setDistance(res);
 
 
@@ -305,7 +306,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
     int counter = 0;
     for(auto i : best_particules)
-        //particules with short distance generate more new particules
+//        particules with short distance generate more new particules
         for(int j = 0; j < NB_PARTICULES*(somme_distance-i.getDistance())/norm; ++j)
             addParticule(oCurrFrame, i.getShape());
 }
