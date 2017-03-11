@@ -21,6 +21,7 @@ private:
     double distance; //distance with suivi baseline
     double distanceHOG; //distance with HOG
     cv::Rect shape;
+    std::vector<float> hist;
 
 public:
     Particule(cv::Rect rec) : shape(rec), distance(0), distanceHOG(0) {}
@@ -33,6 +34,8 @@ public:
     double getDistance() const {return distance;}
     double getHOGDistance() const {return distanceHOG;}
 
+    void setHist(std::vector<float>& h){hist = h;}
+    std::vector<float> getHist() const {return hist;}
 
     //choose between distance, HOG_distance, distance + HOG_distance
     bool operator< (const Particule& other) const {
@@ -70,6 +73,7 @@ private:
 
     cv::Rect myBox;
     std::vector<Particule> particules;
+    std::vector<std::vector<float>> bestHisto;
 public:
     void initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox);
     void apply(const cv::Mat& oCurrFrame, cv::Rect& oOutputBBox);
@@ -246,10 +250,14 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
 
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
-        double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
+        std::vector<float> tmp = getHistogram(oCurrFrame(particules.at(i).getShape()));
+        double res = getDistanceHistogram(histogram, tmp);
 //        res += getDistanceHistogram(histogram_ref, getHistogram(oCurrFrame(particules.at(i).getShape())));
         particules.at(i).setDistance(res);
+        particules.at(i).setHist(tmp);
 
+        for(auto j : bestHisto)
+            res += getDistanceHistogram(histogram, j)*100;
 
         //same but with HOG descriptor
 //        double resHOG = getDistanceHistogram(HOGhistogram, getHOGDescriptor(oCurrFrame(particules.at(i).getShape())));
@@ -273,7 +281,9 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
             }
         }
     }
-
+    if((*best_particules.begin()).getDistance() < 0.005)
+        bestHisto.push_back((*best_particules.begin()).getHist());
+    std::cout << (*best_particules.begin()).getDistance() << "  " << bestHisto.size() << std::endl;
 
     //compute position and size of the box (mean from best particules)
     double somme_distance = 0;
