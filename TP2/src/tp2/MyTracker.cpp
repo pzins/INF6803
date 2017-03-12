@@ -8,7 +8,7 @@
 #include <set>
 
 #define PI 3.14159265
-#define NB_PARTICULES 50
+#define NB_PARTICULES 100
 #define ANGLE_DIVISION 15 //should divide 360
 #define NB_BEST_PARTICULES 2 //number of best particules to compute new box coordinate
 #define RANDOM_RANGE 0.5
@@ -17,7 +17,7 @@
 
 enum DISTANCE_VERSION {DISTANCE_1, L2, BHATTACHARYYA_COURS};
 
-DISTANCE_VERSION DV = DISTANCE_1; //choose which distance between histograms to use
+DISTANCE_VERSION DV = L2; //choose which distance between histograms to use
 
 
 
@@ -274,8 +274,8 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 //    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height + (rand()%11 - 5)));
 
 //    version cours
-    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/10)*dis(gen))));
-    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/10)*dis(gen))));
+    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width +0* round((particule.width/10)*dis(gen))));
+    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height +0* round((particule.height/10)*dis(gen))));
 
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));

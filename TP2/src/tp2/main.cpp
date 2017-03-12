@@ -103,7 +103,6 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::rectangle(oDisplayFrame,oGTBBox.tl(),oGTBBox.br(),cv::Scalar_<uchar>(0,255,0),2); // target box = green
                 cv::imshow("display",oDisplayFrame);
                 cv::waitKey(1);
-                cv::waitKey(0);
 
             }
             std::cout << "Mean CLE : " << meanCLE / decrochage << std::endl;
