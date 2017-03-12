@@ -8,10 +8,14 @@
 #include <set>
 
 #define PI 3.14159265
-#define NB_PARTICULES 50
+#define NB_PARTICULES 200
 #define ANGLE_DIVISION 15 //should divide 360
 #define NB_BEST_PARTICULES 2 //number of best particules to compute new box coordinate
-#define RANDOM_RANGE 0.5
+#define RANDOM_RANGE 0.4
+
+enum DISTANCE_VERSION {DISTANCE_1, L2, BHATTACHARYYA_OPENCV, BHATTACHARYYA_COURS};
+
+DISTANCE_VERSION DV = L2; //choose which distance between histograms to use
 
 
 
@@ -19,34 +23,22 @@ class Particule
 {
 private:
     double distance; //distance with suivi baseline
-    double distanceHOG; //distance with HOG
     cv::Rect shape;
 
 public:
-    Particule(cv::Rect rec) : shape(rec), distance(0), distanceHOG(0) {}
+    Particule(cv::Rect rec) : shape(rec), distance(0) {}
     const cv::Rect& getShape() const {return shape;}
     void setShape(const cv::Rect& rec){shape = rec;}
 
     void setDistance(double value){distance = value;}
-    void setHOGDistance(double value){distanceHOG = value;}
-
     double getDistance() const {return distance;}
-    double getHOGDistance() const {return distanceHOG;}
 
-
-    //choose between distance, HOG_distance, distance + HOG_distance
     bool operator< (const Particule& other) const {
         return distance < other.distance;
-        return distanceHOG+distance < other.distanceHOG+other.distance;
-        return distanceHOG< other.distanceHOG;
     }
     bool operator> (const Particule& other) const {
         return distance > other.distance;
-        return distanceHOG+distance > other.distanceHOG+other.distance;
-        return distanceHOG > other.distanceHOG;
     }
-
-
 };
 
 //comparaison of Particule for set insert
@@ -62,11 +54,6 @@ class MyTracker : public Tracker
 {
 private:
     std::vector<float> histogram; //histogram suivi baseline
-    std::vector<float> HOGhistogram; //histogram HOG
-
-    //histogram initial comme reference pour ajouter des distances basées sur les comparaisons avec ceux là
-    std::vector<float> histogram_ref;
-    std::vector<float> HOGhistogram_ref;
 
     cv::Rect myBox;
     std::vector<Particule> particules;
@@ -81,18 +68,6 @@ public:
 
 std::shared_ptr<Tracker> Tracker::createInstance(){
     return std::shared_ptr<Tracker>(new MyTracker());
-}
-
-
-std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
-    cv::HOGDescriptor d(cv::Size(16,16), cv::Size(16,16), cv::Size(16,16), cv::Size(8,8),9);
-    std::vector<float> desc;
-    d.compute(frame_.clone(), desc);
-//    std::cout << desc.size() << std::endl;
-//    for(auto i : desc)
-//        std::cout << i << " ";
-//    std::cout << std::endl;
-    return desc;
 }
 
 
@@ -151,28 +126,41 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
 
 float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist)
 {
-    //L2 distance
-    double num = 0, deno=0;
-    for(int i = 0; i < refHist.size(); ++i)
+    if(DV == DISTANCE_1)
     {
-        num += pow(refHist.at(i)-currHist.at(i),2);
-        deno += refHist.at(i) + currHist.at(i);
+        //L2 distance
+        double num = 0, deno=0;
+        for(int i = 0; i < refHist.size(); ++i)
+        {
+            num += pow(refHist.at(i)-currHist.at(i),2);
+            deno += refHist.at(i) + currHist.at(i);
+        }
+        return num / deno;
     }
-    return num / deno;
+    else if(DV == L2)
+    {
+        double res = 0;
+        for(int i = 0; i < refHist.size(); ++i)
+            res += pow(refHist.at(i)-currHist.at(i),2);
+        return sqrt(res);
 
-    //Bhattacharyya distance
-    cv::MatND hist(currHist);
-    cv::MatND hist2(refHist);
-    double ret = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
-    return ret;
-
-    //Bhattacharyya du cours
-    float somme = 0;
-    for(int i = 0; i < refHist.size(); ++i)
-        somme += sqrt(currHist.at(i) * currHist.at(i));
-    return -log(somme);
-
-
+    }
+    else if(DV == BHATTACHARYYA_OPENCV)
+    {
+        //Bhattacharyya distance
+        cv::MatND hist(currHist);
+        cv::MatND hist2(refHist);
+        double res = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
+        return res;
+    }
+    else if(DV == BHATTACHARYYA_COURS)
+    {
+        //Bhattacharyya du cours
+        float res = 0;
+        for(int i = 0; i < refHist.size(); ++i)
+            res += sqrt(currHist.at(i) * currHist.at(i));
+        return -log(res);
+    }
 }
 
 
@@ -186,10 +174,6 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
     //init myBox and the associated histogram
     myBox = oInitBBox;
     histogram = getHistogram(oInitFrame(myBox));
-    histogram_ref = histogram;
-    HOGhistogram = getHOGDescriptor(oInitFrame(myBox));
-    HOGhistogram_ref = HOGhistogram;
-
 
     //create particules from myBox
     for(int i = 0; i < NB_PARTICULES-1; ++i){
@@ -221,8 +205,8 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 //    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height + (rand()%11 - 5)));
 
 //    version cours
-    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/9)*dis(gen))));
-    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/9)*dis(gen))));
+    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + 0*round((particule.width/9)*dis(gen))));
+    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + 0*round((particule.height/9)*dis(gen))));
 
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
@@ -247,21 +231,11 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
         double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
-//        res += getDistanceHistogram(histogram_ref, getHistogram(oCurrFrame(particules.at(i).getShape())));
         particules.at(i).setDistance(res);
-
-
-        //same but with HOG descriptor
-//        double resHOG = getDistanceHistogram(HOGhistogram, getHOGDescriptor(oCurrFrame(particules.at(i).getShape())));
-//        resHOG += getDistanceHistogram(HOGhistogram_ref, getHOGDescriptor(oCurrFrame(particules.at(i).getShape())));
-//        particules.at(i).setHOGDistance(resHOG);
 
         //add only if better score than the worst in particules, or if size of particules < NB_BEST_PARTICULES
         if(best_particules.begin() == best_particules.end())
-        {
-            if(best_particules.size() < NB_BEST_PARTICULES || *best_particules.begin() > particules.at(i))
-                best_particules.insert(particules.at(i));
-        }
+            best_particules.insert(particules.at(i));
         else
         {
             if(best_particules.size() < NB_BEST_PARTICULES || *best_particules.rbegin() > particules.at(i))
@@ -293,7 +267,6 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
     // update histogram
     histogram=getHistogram(oCurrFrame(myBox));
-//    HOGhistogram=getHOGDescriptor(oCurrFrame(myBox));
 
     //clear old particules
     particules.clear();
