@@ -1,17 +1,6 @@
 #include "tp2/common.hpp"
 #include <unistd.h>
 
-#define THRESHOLD_TRACKING_GOOD_POS 50
-#define THRESHOLD_TRACKING_GOOD_SIZE 50
-
-bool isTrackingGood(const cv::Rect& ref, cv::Rect& myRect)
-{
-    if(abs(ref.x-myRect.x) > THRESHOLD_TRACKING_GOOD_POS) return false;
-    if(abs(ref.y-myRect.y) > THRESHOLD_TRACKING_GOOD_POS) return false;
-    if(abs(ref.width-myRect.width) > THRESHOLD_TRACKING_GOOD_SIZE) return false;
-    if(abs(ref.height-myRect.height) > THRESHOLD_TRACKING_GOOD_SIZE) return false;
-    return true;
-}
 
 float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 {
@@ -54,7 +43,6 @@ int main(int /*argc*/, char** /*argv*/) {
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
             int nbFrames = 0;
-            int nbFramesGood = 0;
             double meanCLE = 0, meanOR = 0;
             int decrochage = 0;
 
@@ -76,32 +64,29 @@ int main(int /*argc*/, char** /*argv*/) {
 
                 // @@@@@ TODO : compute CLE/OR with oGTBBox and oOutputBBox here*
                 ++nbFrames;
-                if(isTrackingGood(oGTBBox, oOutputBBox))
+                if(decrochage == 0)
                 {
-                    nbFramesGood++;
-                    if(nbFrames == nbFramesGood)
-                        decrochage++;
+                    double tmp = computeOR(oGTBBox, oOutputBBox);
+                    if(tmp != 0)
+                    {
+                        meanOR += tmp;
+                        meanCLE += computeCLE(oGTBBox, oOutputBBox);
+                    } else {
+                        decrochage = nbFrames;
+                    }
                 }
-                meanCLE += computeCLE(oGTBBox, oOutputBBox);
-                double tmp = computeOR(oGTBBox, oOutputBBox);
-                meanOR += tmp;
-
                 // for display purposes only
                 cv::Mat oDisplayFrame = oCurrFrame.clone();
                 cv::rectangle(oDisplayFrame,oOutputBBox.tl(),oOutputBBox.br(),cv::Scalar_<uchar>(255,0,0),2); // output box = blue
                 cv::rectangle(oDisplayFrame,oGTBBox.tl(),oGTBBox.br(),cv::Scalar_<uchar>(0,255,0),2); // target box = green
                 cv::imshow("display",oDisplayFrame);
                 cv::waitKey(1);
-//                int a;std::cin>>a;
-//                usleep(100œ000);
-//                usleep(5000000);
-                cv::waitKey(0);
+//                cv::waitKey(0);
 
             }
-            std::cout << "Mean CLE : " << meanCLE / nbFrames << std::endl;
-            std::cout << "Mean OR : " << meanOR / nbFrames<< std::endl;
-            std::cout << "Suivi Algo : " << nbFramesGood << "/" << nbFrames << std::endl;
-            std::cout << "NB frame avant decrochage : " << decrochage << "/" << nbFrames << std::endl;
+            std::cout << "Mean CLE : " << meanCLE / decrochage << std::endl;
+            std::cout << "Mean OR : " << meanOR / decrochage << std::endl;
+            std::cout << "Suivi Algo : " << decrochage << "/" << nbFrames << std::endl;
             // @@@@ TODO : compute average CLE/OR measure for current sequence here
 
         }
