@@ -8,15 +8,14 @@
 #include <set>
 
 #define PI 3.14159265
-#define NB_PARTICULES 500
-#define ANGLE_DIVISION 15 //should divide 360
+#define NB_PARTICULES 100
 #define NB_BEST_PARTICULES 2//number of best particules to compute new box coordinate
-#define RANDOM_RANGE 0.3
+#define RANDOM_RANGE 0.5
 
 
 enum DISTANCE_VERSION {DISTANCE_1, L2, BHATTACHARYYA_OPENCV, BHATTACHARYYA_COURS};
 
-DISTANCE_VERSION DV = L2; //choose which distance between histograms to use
+DISTANCE_VERSION DV = BHATTACHARYYA_OPENCV; //choose which distance between histograms to use
 
 
 class Particule
@@ -76,7 +75,6 @@ std::shared_ptr<Tracker> Tracker::createInstance(){
 
 
 std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
-
     cv::HOGDescriptor d(frame_.size(), cv::Size(16,16), cv::Size(8,8), cv::Size(8,8),9);
     std::vector<float> desc;
     d.compute(frame_.clone(), desc);
@@ -100,7 +98,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     else if(DV == L2)
     {
         double res = 0;
-        for(int i = 0; i < refHist.size(); ++i)
+        for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
             res += pow(refHist.at(i)-currHist.at(i),2);
         return sqrt(res);
 
@@ -162,20 +160,12 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, const cv::Rect particule
     std::uniform_real_distribution<> dis(-RANDOM_RANGE, RANDOM_RANGE);
 
     //positions
-    //version with +/- a few pixels
-//    double x = particule.x+ rand()%11 - 5;
-//    double y = particule.y+ rand()%11 - 5;
-
-    //version cours
-    double x = particule.x+ round(2*particule.width*dis(gen));
-    double y = particule.y+ round(2*particule.height*dis(gen));
+    double x = particule.x+ round(particule.width*dis(gen));
+    double y = particule.y+ round(particule.height*dis(gen));
 
     //size
-    //version with +/- a few pixels
-//    double regionSizeW = std::max(1, std::min(oCurrFrame.size().width, particule.width + (rand()%11 - 5)));
-//    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height + (rand()%11 - 5)));
-
-//    version cours
+//    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/10)*dis(gen))));
+//    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/10)*dis(gen))));
     double regionSizeW = std::max(1, std::min(oCurrFrame.size().width, particule.width));
     double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height));
 
@@ -191,6 +181,7 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, const cv::Rect particule
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox, const cv::Rect& truth)
 {
     cv::Mat with_part(oCurrFrame.clone());
+
 
     //set with only NB_BEST_PARTICULES particules
     std::set<Particule, mycompare> best_particules;
@@ -223,6 +214,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox, const cv
             }
         }
     }
+
     //compute position and size of the box (mean from best particules)
     double somme_distance = 0;
 
