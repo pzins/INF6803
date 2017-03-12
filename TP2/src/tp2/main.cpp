@@ -13,6 +13,27 @@ float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 
 double computeOR(const cv::Rect& ref, cv::Rect& myRect)
 {
+    //check if there is no overlap
+    int x_min = std::min(ref.x, myRect.x);
+    if(x_min == ref.x)
+    {
+        if(myRect.x - ref.x > ref.width)
+            return 0;
+    }
+    else {
+        if(ref.x - myRect.x > myRect.width)
+            return 0;
+    }
+
+    int y_min = std::min(ref.y, myRect.y);
+    if(y_min == ref.y){
+        if(ref.y-myRect.y > ref.height) return 0;
+    }
+    else
+    {
+        if(ref.y - myRect.y > myRect.height) return 0;
+    }
+
     cv::Point hg(std::max(ref.x, myRect.x), std::max(ref.y, myRect.y));
     cv::Point bd(std::min(ref.x+ref.width, myRect.x+myRect.width), std::min(ref.y+ref.height, myRect.y+myRect.height));
     double res = abs(bd.x-hg.x)*abs(bd.y-hg.y);
