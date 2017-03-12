@@ -68,11 +68,12 @@ int main(int /*argc*/, char** /*argv*/) {
                 CV_Assert(!oCurrFrame.empty() && oInitFrame.size()==oCurrFrame.size() && oCurrFrame.type()==CV_8UC3);
                 cv::Rect oOutputBBox;
 
-                pAlgo->apply(oCurrFrame,oOutputBBox);
 
                 std::getline(oGTFile,sCurrGTLine);
                 CV_Assert(!sCurrGTLine.empty());
                 const cv::Rect oGTBBox = convertToRect(sCurrGTLine);
+
+                pAlgo->apply(oCurrFrame,oOutputBBox, oGTBBox);
 
                 // @@@@@ TODO : compute CLE/OR with oGTBBox and oOutputBBox here*
                 ++nbFrames;
