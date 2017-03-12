@@ -13,6 +13,27 @@ float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 
 double computeOR(const cv::Rect& ref, cv::Rect& myRect)
 {
+    //check if there is no overlap
+    int x_min = std::min(ref.x, myRect.x);
+    if(x_min == ref.x)
+    {
+        if(myRect.x - ref.x > ref.width)
+            return 0;
+    }
+    else {
+        if(ref.x - myRect.x > myRect.width)
+            return 0;
+    }
+
+    int y_min = std::min(ref.y, myRect.y);
+    if(y_min == ref.y){
+        if(ref.y-myRect.y > ref.height) return 0;
+    }
+    else
+    {
+        if(ref.y - myRect.y > myRect.height) return 0;
+    }
+
     cv::Point hg(std::max(ref.x, myRect.x), std::max(ref.y, myRect.y));
     cv::Point bd(std::min(ref.x+ref.width, myRect.x+myRect.width), std::min(ref.y+ref.height, myRect.y+myRect.height));
     double res = abs(bd.x-hg.x)*abs(bd.y-hg.y);
@@ -28,7 +49,7 @@ int main(int /*argc*/, char** /*argv*/) {
         const std::string sBaseDataPath(DATA_ROOT_PATH "/tp2/");
         const std::vector<std::string> vsSequenceNames = {"dog","face","woman"};
         const std::vector<size_t> vnSequenceSizes = {988,892,597};
-        for(size_t nSeqIdx=2; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
+        for(size_t nSeqIdx=0; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
             std::cout << "\nProcessing sequence '" << vsSequenceNames[nSeqIdx] << "'..." << std::endl;
             const std::string sInitFramePath = sBaseDataPath+vsSequenceNames[nSeqIdx]+"/img/0001.jpg";
             const cv::Mat oInitFrame = cv::imread(sInitFramePath);
@@ -67,6 +88,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 if(decrochage == 0)
                 {
                     double tmp = computeOR(oGTBBox, oOutputBBox);
+                    std::cout << "OL " << tmp << std::endl;
                     if(tmp != 0)
                     {
                         meanOR += tmp;
@@ -81,7 +103,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 cv::rectangle(oDisplayFrame,oGTBBox.tl(),oGTBBox.br(),cv::Scalar_<uchar>(0,255,0),2); // target box = green
                 cv::imshow("display",oDisplayFrame);
                 cv::waitKey(1);
-//                cv::waitKey(0);
+                cv::waitKey(0);
 
             }
             std::cout << "Mean CLE : " << meanCLE / decrochage << std::endl;

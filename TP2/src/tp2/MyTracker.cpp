@@ -265,8 +265,8 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 //    double y = particule.y+ rand()%11 - 5;
 
     //version cours
-    double x = particule.x+ round(2*particule.width*dis(gen));
-    double y = particule.y+ round(2*particule.height*dis(gen));
+    double x = particule.x + round(2*particule.width*dis(gen));
+    double y = particule.y + round(2*particule.height*dis(gen));
 
     //size
     //version with +/- a few pixels
