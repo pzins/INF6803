@@ -99,6 +99,7 @@ std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
 
 
 std::vector<float> getHistogram(const cv::Mat& frame_){
+    std::cout << "111111" << std::endl;
     int ddepth = CV_16S;
     int scale = 1;
     int delta = 0;
@@ -139,23 +140,26 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
     int nb_cell_height = frame_.size().height / CELL_SIZE;
 
     std::vector<std::vector<std::vector<float>>> matHisto;
+    std::vector<std::vector<float>> matMag;
 
     std::vector<int> bins = {10,30,50,70,90,110,130,150,170};
     for(int i = 0; i < nb_cell_height; ++i)
     {
         std::vector<std::vector<float>> tmp;
+        std::vector<float> tmp2;
 
         for(int j = 0; j < nb_cell_width; ++j)
         {
             cv::Mat cellGrad(frame, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
             cv::Mat cellDir(directions, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
             std::vector<float> histoCell(9, 0);
+            float sumMag = 0;
             for(int x = 0; x < 8; ++x)
             {
                 for(int y = 0; y < 8; ++y)
                 {
                     double value = cellDir.at<uint8_t>(x,y);
-
+                    sumMag += cellGrad.at<uint8_t>(x,y);
 
                     int idx = 0;
                     for(int a = 0; a < bins.size(); ++a)
@@ -165,7 +169,7 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
                             break;
                         }
                     }
-                    std::cout << value << " " << idx <<  std::endl;
+//                    std::cout << value << " " << idx <<  std::endl;
 
                     if(value>=170 || value <= 10){
                         histoCell.at(idx) += cellGrad.at<uint8_t>(x,y);
@@ -186,14 +190,42 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
                 }
             }
             tmp.push_back(histoCell);
+            tmp2.push_back(sumMag);
         }
+        matMag.push_back(tmp2);
         matHisto.push_back(tmp);
     }
-    std::cout << "size = " << matHisto.size() << std::endl;
-    for(auto i : matHisto)
-        std::cout << i.size() << " ";
-    std::cout << std::endl;
 
+
+//    std::cout << "size = " << matHisto.size() << std::endl;
+//    for(auto i : matHisto)
+//        std::cout << i.size() << " ";
+//    std::cout << std::endl;
+
+
+    std::vector<float> finalRes;
+
+    for(int i = 0; i < nb_cell_height-1; ++i)
+    {
+        for(int j = 0; j < nb_cell_width - 1; ++j)
+        {
+            std::vector<float> res = matHisto.at(i).at(j);
+//            std::cout << matHisto.size() << std::endl;
+            res.insert(res.end(), matHisto.at(i).at(j+1).begin(), matHisto.at(i).at(j+1).end());
+            res.insert(res.end(), matHisto.at(i+1).at(j).begin(), matHisto.at(i+1).at(j).end());
+            res.insert(res.end(), matHisto.at(i+1).at(j+1).begin(), matHisto.at(i+1).at(j+1).end());
+            double norm = matMag.at(i).at(j)+matMag.at(i+1).at(j)+matMag.at(i).at(j+1)+matMag.at(i+1).at(j+1);
+            double norm2 = 0;
+            for(int k = 0; k < res.size(); ++k)
+                norm2 += pow(res.at(i),2) + 0.5*0.5;
+            for(int k = 0; k < res.size(); ++k)
+                res.at(k) /= sqrt(norm2);
+            finalRes.insert(finalRes.end(), res.begin(), res.end());
+        }
+    }
+
+    std::cout << "RES SIZE " << finalRes.size() << " " << (nb_cell_height-1)*(nb_cell_width-1)*36<< std::endl;
+    return finalRes;
     std::vector<float> histo(360,0);
 
     //sum of gradient of the frame
@@ -233,7 +265,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
 {
     //L2 distance
     double num = 0, deno=0;
-    for(int i = 0; i < refHist.size(); ++i)
+    for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
     {
         num += pow(refHist.at(i)-currHist.at(i),2);
         deno += refHist.at(i) + currHist.at(i);
@@ -301,8 +333,8 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 //    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height + (rand()%11 - 5)));
 
 //    version cours
-    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/9)*dis(gen))));
-    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/9)*dis(gen))));
+    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/10)*dis(gen))));
+    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/10)*dis(gen))));
 
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
