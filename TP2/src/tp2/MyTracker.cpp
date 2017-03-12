@@ -13,6 +13,8 @@
 #define NB_BEST_PARTICULES 2 //number of best particules to compute new box coordinate
 #define RANDOM_RANGE 0.5
 
+#define CELL_SIZE 8
+
 
 
 class Particule
@@ -119,6 +121,79 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
     // Sum gradient X and Y
     cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, frame);
 
+    cv::Mat directions(frame.clone());
+    for(int i = 0; i < frame.rows; ++i){
+        for(int j = 0; j < frame.cols; ++j){
+            //compute the angle
+            float angle = atan2((float)grad_y.at<int16_t>(i,j), (float)grad_x.at<int16_t>(i,j)) * 180 / PI;
+            //to get gradient direction between 0-360
+            if(angle<0)
+                angle = 180 + angle;
+            directions.at<uint8_t>(i,j) = angle;
+        }
+    }
+    std::cout << "----" << std::endl;
+
+
+    int nb_cell_width = frame_.size().width / CELL_SIZE;
+    int nb_cell_height = frame_.size().height / CELL_SIZE;
+
+    std::vector<std::vector<std::vector<float>>> matHisto;
+
+    std::vector<int> bins = {10,30,50,70,90,110,130,150,170};
+    for(int i = 0; i < nb_cell_height; ++i)
+    {
+        std::vector<std::vector<float>> tmp;
+
+        for(int j = 0; j < nb_cell_width; ++j)
+        {
+            cv::Mat cellGrad(frame, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+            cv::Mat cellDir(directions, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+            std::vector<float> histoCell(9, 0);
+            for(int x = 0; x < 8; ++x)
+            {
+                for(int y = 0; y < 8; ++y)
+                {
+                    double value = cellDir.at<uint8_t>(x,y);
+
+
+                    int idx = 0;
+                    for(int a = 0; a < bins.size(); ++a)
+                    {
+                        if(value <= bins.at(a)+10 && value >= bins.at(a)-10){
+                            idx = a;
+                            break;
+                        }
+                    }
+                    std::cout << value << " " << idx <<  std::endl;
+
+                    if(value>=170 || value <= 10){
+                        histoCell.at(idx) += cellGrad.at<uint8_t>(x,y);
+                    }
+                    else{
+                        if(idx == 8){
+                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
+                            histoCell.at(idx-1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx-1)))/20;
+                        } else if(idx == 0){
+                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
+                            histoCell.at(idx+1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx+1)))/20;
+                        } else {
+                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
+                            histoCell.at(idx+1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx+1)))/20;
+                        }
+
+                    }
+                }
+            }
+            tmp.push_back(histoCell);
+        }
+        matHisto.push_back(tmp);
+    }
+    std::cout << "size = " << matHisto.size() << std::endl;
+    for(auto i : matHisto)
+        std::cout << i.size() << " ";
+    std::cout << std::endl;
+
     std::vector<float> histo(360,0);
 
     //sum of gradient of the frame
@@ -130,7 +205,9 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
             float angle = atan2((float)grad_y.at<int16_t>(i,j), (float)grad_x.at<int16_t>(i,j)) * 180 / PI;
             //to get gradient direction between 0-360
             if(angle<0)
-                angle = 180 + (180 + angle)-1;
+                angle = 180 + angle;//(180 + angle)-1;
+//                angle = 180 + (180 + angle)-1;
+
             histo.at(static_cast<int>(angle)) += frame.at<uint8_t>(i,j) / sum_gradient;
         }
     }
@@ -140,11 +217,14 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
     for(int i = 0; i < ANGLE_DIVISION; ++i)
     {
         double tmp = 0;
-        for(int j = 0; j < 360/ANGLE_DIVISION; ++j){
-            tmp += histo.at(i * 360/ANGLE_DIVISION + j);
+        for(int j = 0; j < 180/ANGLE_DIVISION; ++j){
+            tmp += histo.at(i * 180/ANGLE_DIVISION + j);
         }
         res.push_back(tmp);
     }
+    for(auto i : res)
+        std::cout << i << " ";
+    std::cout << std::endl;
     return res;
 }
 
