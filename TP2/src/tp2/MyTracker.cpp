@@ -105,94 +105,98 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
         for(int j = 0; j < frame.cols; ++j){
             //compute the angle
             float angle = atan2((float)grad_y.at<int16_t>(i,j), (float)grad_x.at<int16_t>(i,j)) * 180 / PI;
-            //to get gradient direction between 0-360
+            //to get gradient direction between 0-180
             if(angle<0)
                 angle = 180 + angle;
             directions.at<uint8_t>(i,j) = angle;
         }
     }
 
-
+    //max number of cell (in width and in height) in the box
     int nb_cell_width = frame_.size().width / CELL_SIZE;
     int nb_cell_height = frame_.size().height / CELL_SIZE;
 
+    //matrix with cell histogramm
     std::vector<std::vector<std::vector<float>>> matHisto;
-    std::vector<std::vector<float>> matMag;
 
+    //bins angles
     std::vector<int> bins = {10,30,50,70,90,110,130,150,170};
+    //iterate over each cell
     for(int i = 0; i < nb_cell_height; ++i)
     {
+        //vector of cell histogram for one row
         std::vector<std::vector<float>> tmp;
-        std::vector<float> tmp2;
 
         for(int j = 0; j < nb_cell_width; ++j)
         {
-            cv::Mat cellGrad(frame, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+            //get cell gradient direction and magnitude
+            cv::Mat cellMag(frame, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
             cv::Mat cellDir(directions, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+
+            //create the cell histogram
             std::vector<float> histoCell(9, 0);
-            float sumMag = 0;
+
+            //iterate over pixels in a cell
             for(int x = 0; x < 8; ++x)
             {
                 for(int y = 0; y < 8; ++y)
                 {
                     double value = cellDir.at<uint8_t>(x,y);
-                    sumMag += cellGrad.at<uint8_t>(x,y);
 
-                    int idx = 0;
+                    //find the correct bin (go through bins and stop when value is smaller)
+                    int idx = -1;
                     for(int a = 0; a < bins.size(); ++a)
                     {
-                        if(value <= bins.at(a)+10 && value >= bins.at(a)-10){
+                        if(value <= bins.at(a)){
                             idx = a;
                             break;
                         }
                     }
 
-                    if(value>=170 || value <= 10){
-                        histoCell.at(idx) += cellGrad.at<uint8_t>(x,y);
+
+                    // update histogram : two bins are increased if the angle is between
+                    //special case : only on bin
+                    if(idx == 0){
+                        histoCell.at(idx) += cellMag.at<uint8_t>(x,y);
+                    } else if(idx == -1)
+                    {
+                        histoCell.at(histoCell.size()-1) += cellMag.at<uint8_t>(x,y);
                     }
                     else{
-                        if(idx == 8){
-                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
-                            histoCell.at(idx-1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx-1)))/20;
-                        } else if(idx == 0){
-                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
-                            histoCell.at(idx+1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx+1)))/20;
-                        } else {
-                            histoCell.at(idx) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
-                            histoCell.at(idx+1) += cellGrad.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx+1)))/20;
-                        }
-
+                        histoCell.at(idx) += cellMag.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
+                        histoCell.at(idx-1) += cellMag.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx-1)))/20;
                     }
                 }
             }
             tmp.push_back(histoCell);
-            tmp2.push_back(sumMag);
         }
-        matMag.push_back(tmp2);
         matHisto.push_back(tmp);
     }
 
 
     std::vector<float> finalRes;
 
+    //iterate over blocks (1 block = 2x2 cells)
     for(int i = 0; i < nb_cell_height-1; ++i)
     {
         for(int j = 0; j < nb_cell_width - 1; ++j)
         {
+            //concatenate 4 histograms
             std::vector<float> res = matHisto.at(i).at(j);
             res.insert(res.end(), matHisto.at(i).at(j+1).begin(), matHisto.at(i).at(j+1).end());
             res.insert(res.end(), matHisto.at(i+1).at(j).begin(), matHisto.at(i+1).at(j).end());
             res.insert(res.end(), matHisto.at(i+1).at(j+1).begin(), matHisto.at(i+1).at(j+1).end());
-            double norm = matMag.at(i).at(j)+matMag.at(i+1).at(j)+matMag.at(i).at(j+1)+matMag.at(i+1).at(j+1);
-            double norm2 = 0;
+
+            double norm = 0;
+            //compute normalisation
             for(int k = 0; k < res.size(); ++k)
-                norm2 += pow(res.at(i),2) + 0.5*0.5;
+                norm += pow(res.at(i),2) + 0.5*0.5;
+
             for(int k = 0; k < res.size(); ++k)
-                res.at(k) /= sqrt(norm2);
+                res.at(k) /= sqrt(norm);
             finalRes.insert(finalRes.end(), res.begin(), res.end());
         }
     }
-
     return finalRes;
 }
 
