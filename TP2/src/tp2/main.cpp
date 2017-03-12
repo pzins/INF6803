@@ -75,7 +75,6 @@ int main(int /*argc*/, char** /*argv*/) {
                         decrochage = nbFrames;
                     }
                 }
-                std::cout << decrochage << std::endl;
                 // for display purposes only
                 cv::Mat oDisplayFrame = oCurrFrame.clone();
                 cv::rectangle(oDisplayFrame,oOutputBBox.tl(),oOutputBBox.br(),cv::Scalar_<uchar>(255,0,0),2); // output box = blue
