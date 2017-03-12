@@ -14,6 +14,10 @@
 #define RANDOM_RANGE 0.3
 
 
+enum DISTANCE_VERSION {DISTANCE_1, L2, BHATTACHARYYA_OPENCV, BHATTACHARYYA_COURS};
+
+DISTANCE_VERSION DV = L2; //choose which distance between histograms to use
+
 
 class Particule
 {
@@ -82,37 +86,41 @@ std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
 
 float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist)
 {
-
-    double re = 0;
-    for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
+    if(DV == DISTANCE_1)
     {
-        re += pow(refHist.at(i)-currHist.at(i),2);
+        //L2 distance
+        double num = 0, deno=0;
+        for(int i = 0; i < refHist.size(); ++i)
+        {
+            num += pow(refHist.at(i)-currHist.at(i),2);
+            deno += refHist.at(i) + currHist.at(i);
+        }
+        return num / deno;
     }
-    return sqrt(re);
-    //Bhattacharyya distance
-    cv::MatND hist(currHist);
-    cv::MatND hist2(refHist);
-    double ret = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
-    return ret;
-
-
-
-    //L2 distance
-    double num = 0, deno=0;
-    for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
+    else if(DV == L2)
     {
-        num += pow(refHist.at(i)-currHist.at(i),2);
-        deno += refHist.at(i) + currHist.at(i);
+        double res = 0;
+        for(int i = 0; i < refHist.size(); ++i)
+            res += pow(refHist.at(i)-currHist.at(i),2);
+        return sqrt(res);
+
     }
-    return num / deno;
-
-    //Bhattacharyya du cours
-    float somme = 0;
-    for(int i = 0; i < refHist.size(); ++i)
-        somme += sqrt(currHist.at(i) * currHist.at(i));
-    return -log(somme);
-
-
+    else if(DV == BHATTACHARYYA_OPENCV)
+    {
+        //Bhattacharyya distance
+        cv::MatND hist(currHist);
+        cv::MatND hist2(refHist);
+        double res = cv::compareHist(hist, hist2, CV_COMP_BHATTACHARYYA);
+        return res;
+    }
+    else if(DV == BHATTACHARYYA_COURS)
+    {
+        //Bhattacharyya du cours
+        float res = 0;
+        for(int i = 0; i < refHist.size(); ++i)
+            res += sqrt(currHist.at(i) * currHist.at(i));
+        return -log(res);
+    }
 }
 
 void correctRect(cv::Rect& rec){
@@ -221,14 +229,12 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox, const cv
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     for(auto i : best_particules)
     {
-        std::cout << i.getHOGDistance() << " ";
         somme_distance += i.getHOGDistance(); //get the sum of all distance
         x_ += i.getShape().x;
         y_ += i.getShape().y;
         w_ += i.getShape().size().width;
         h_ += i.getShape().size().height;
     }
-    std::cout << std::endl;
     double bests_size = best_particules.size();
     //mean
     myBox = cv::Rect(x_/bests_size, y_/bests_size, w_/bests_size, h_/bests_size);
@@ -257,6 +263,8 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox, const cv
             addParticule(oCurrFrame, i.getShape());
     }
 
+
+    //to debug : new windows with particule so that they don't affect the real comlputation
     cv::rectangle(with_part,cv::Point(myBox.x,myBox.y), cv::Point(myBox.x+myBox.width,myBox.y+myBox.height), cv::Scalar(255,0,0),2);
     cv::rectangle(with_part,cv::Point(truth.x,truth.y), cv::Point(truth.x+truth.width,truth.y+truth.height), cv::Scalar(0,255,0),2);
     cv::imshow("s",with_part);
