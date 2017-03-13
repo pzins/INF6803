@@ -61,6 +61,7 @@ class MyTracker : public Tracker
 {
 private:
     std::vector<float> histogram; //histogram suivi baseline
+    std::vector<float> refHistogram;
 
     cv::Rect myBox;
     std::vector<Particule> particules;
@@ -190,6 +191,7 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
     //init myBox and the associated histogram
     myBox = oInitBBox;
     histogram = getHistogram(oInitFrame(myBox));
+    refHistogram = getHistogram(oInitFrame(myBox));
 
     //create particules from myBox
     for(int i = 0; i < NB_PARTICULES-1; ++i){
@@ -197,6 +199,7 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
     }
     //also add the current myBox to the particules
     particules.push_back(Particule(myBox));
+
 }
 
 
@@ -237,6 +240,7 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
         double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
+//        res += getDistanceHistogram(refHistogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
         particules.at(i).setDistance(res);
 
         //add only if better score than the worst in particules, or if size of particules < NB_BEST_PARTICULES
