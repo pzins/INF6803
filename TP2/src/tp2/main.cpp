@@ -49,7 +49,7 @@ int main(int /*argc*/, char** /*argv*/) {
         const std::string sBaseDataPath(DATA_ROOT_PATH "/tp2/");
         const std::vector<std::string> vsSequenceNames = {"dog","face","woman"};
         const std::vector<size_t> vnSequenceSizes = {988,892,597};
-        for(size_t nSeqIdx=0; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
+        for(size_t nSeqIdx=2; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
             std::cout << "\nProcessing sequence '" << vsSequenceNames[nSeqIdx] << "'..." << std::endl;
             const std::string sInitFramePath = sBaseDataPath+vsSequenceNames[nSeqIdx]+"/img/0001.jpg";
             const cv::Mat oInitFrame = cv::imread(sInitFramePath);
