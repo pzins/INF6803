@@ -1,6 +1,7 @@
 #include "tp2/common.hpp"
 #include <unistd.h>
 
+#define NB_FRAME_BEFORE_DECROCHAGE 10
 
 float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 {
@@ -17,17 +18,15 @@ double computeOR(const cv::Rect& ref, cv::Rect& myRect)
     int x_min = std::min(ref.x, myRect.x);
     if(x_min == ref.x)
     {
-        if(myRect.x - ref.x > ref.width)
-            return 0;
+        if(myRect.x - ref.x > ref.width) return 0;
     }
     else {
-        if(ref.x - myRect.x > myRect.width)
-            return 0;
+        if(ref.x - myRect.x > myRect.width) return 0;
     }
 
     int y_min = std::min(ref.y, myRect.y);
     if(y_min == ref.y){
-        if(ref.y-myRect.y > ref.height) return 0;
+        if(myRect.y-ref.y > ref.height) return 0;
     }
     else
     {
@@ -66,6 +65,7 @@ int main(int /*argc*/, char** /*argv*/) {
             int nbFrames = 0;
             double meanCLE = 0, meanOR = 0;
             int decrochage = 0;
+            int nb_frame_decroche = 0;
 
 
             pAlgo->initialize(oInitFrame, oInitBBox);
@@ -92,8 +92,11 @@ int main(int /*argc*/, char** /*argv*/) {
                     {
                         meanOR += tmp;
                         meanCLE += computeCLE(oGTBBox, oOutputBBox);
+                        nb_frame_decroche = 0; //reset
                     } else {
-                        decrochage = nbFrames;
+                        nb_frame_decroche++;
+                        if(nb_frame_decroche == NB_FRAME_BEFORE_DECROCHAGE)
+                            decrochage = nbFrames;
                     }
                 }
                 // for display purposes only

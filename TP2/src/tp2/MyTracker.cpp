@@ -10,7 +10,8 @@
 #define PI 3.14159265
 #define NB_PARTICULES 100
 
-#define RANDOM_RANGE 0.5 //range for x,y to compute particule
+#define FACTOR_CHANGE_PARTICULE_POSITION 1
+#define FACTOR_CHANGE_PARTICULE_SIZE 10
 #define NB_BEST_PARTICULES_BOX 3 //number of best particules to compute new box coordinate
 #define NB_BEST_PARTICULES_PART 3 //number of best particules to compute new box coordinate
 
@@ -21,12 +22,14 @@
 //version myHOG
 #define CELL_SIZE 8
 
-enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA};
+#define USE_REFERENCE_BOX false
 
+
+enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA}; //BHATTACHARYYA doesn't work if histogram have difference size (HOG_OPENCV, _MY_HOG)
 DISTANCE_VERSION DV = CHI2; //choose which distance between histograms to use
 
 enum VERSION {BASELINE, HOG_OPENCV, MY_HOG};
-VERSION V = MY_HOG;
+VERSION V = HOG_OPENCV;
 
 
 class Particule
@@ -73,6 +76,7 @@ private:
 
     cv::Rect myBox;
     std::vector<Particule> particules;
+    cv::Size initSizeBox;
 public:
     void initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox);
     void apply(const cv::Mat& oCurrFrame, cv::Rect& oOutputBBox);
@@ -250,8 +254,6 @@ std::vector<float> getMyHOGDescriptor(const cv::Mat& frame_){
                             break;
                         }
                     }
-
-
                     // update histogram : two bins are increased if the angle is between
                     //special case : only on bin
                     if(idx == 0){
@@ -316,7 +318,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     {
         //L2 distance
         double res = 0;
-        for(int i = 0; i < refHist.size(); ++i)
+        for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
         {
             if(refHist.at(i) + currHist.at(i) == 0) continue; //if both histogram have 0, continue to the next index
             res += pow(refHist.at(i)-currHist.at(i),2) / (refHist.at(i) + currHist.at(i));
@@ -326,7 +328,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     else if(DV == L2)
     {
         double res = 0;
-        for(int i = 0; i < refHist.size(); ++i)
+        for(int i = 0; i < std::min(refHist.size(), currHist.size()); ++i)
             res += pow(refHist.at(i)-currHist.at(i),2);
         return sqrt(res);
 
@@ -341,11 +343,45 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     }
 }
 
+void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-0.5, 0.5);
+
+    //positions
+    double x = particule.x+ FACTOR_CHANGE_PARTICULE_POSITION * round(particule.width*dis(gen));
+    double y = particule.y+ FACTOR_CHANGE_PARTICULE_POSITION * round(particule.height*dis(gen));
+
+    //size
+    double regionSizeW = std::max(1, std::min(oCurrFrame.size().width, particule.width));
+    double regionSizeH = std::max(1, std::min(oCurrFrame.size().height, particule.height));
+    //if baseline we can change particule size
+    if(V == BASELINE)
+    {
+        regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/FACTOR_CHANGE_PARTICULE_SIZE)*dis(gen))));
+        regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/FACTOR_CHANGE_PARTICULE_SIZE)*dis(gen))));
+    }
+    if(regionSizeW < initSizeBox.width && regionSizeH < initSizeBox.height)
+    {
+        regionSizeH = particule.size().height;
+        regionSizeW = particule.size().width;
+    }
+    //limit inside the box
+    x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
+    y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
+    cv::Rect res(x, y, regionSizeW, regionSizeH);
+    if(V == HOG_OPENCV) correctRect(res);
+    particules.push_back(res);
+}
+
 
 void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 {
     srand (time(NULL));
 
+    //save initial size to prevent box to become too small
+    initSizeBox = oInitBBox.size();
 
     //clear particules between videos
     particules.clear();
@@ -366,27 +402,6 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 }
 
 
-void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
-{
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(-RANDOM_RANGE, RANDOM_RANGE);
-
-    //positions
-    double x = particule.x+ round(2*particule.width*dis(gen));
-    double y = particule.y+ round(2*particule.height*dis(gen));
-
-    //size
-    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + 0*round((particule.width/3)*dis(gen))));
-    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + 0*round((particule.height/3)*dis(gen))));
-
-    //limit inside the box
-    x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
-    y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
-    cv::Rect res(x, y, regionSizeW, regionSizeH);
-    if(V == HOG_OPENCV) correctRect(res);
-    particules.push_back(res);
-}
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
@@ -402,10 +417,12 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 //                      cv::Point(particules.at(i).getShape().x+particules.at(i).getShape().size().width,
 //                                particules.at(i).getShape().y+particules.at(i).getShape().size().height), cv::Scalar(0,0,255));
 
-
         // compute distance between each particules histogram and the oOutputBBox histogram at the previous frame
-        double res = getDistanceHistogram(histogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
-//        res += getDistanceHistogram(refHistogram, getHistogram(oCurrFrame(particules.at(i).getShape())));
+        std::vector<float> histo_parti = getHistogram(oCurrFrame(particules.at(i).getShape()));
+        double res = getDistanceHistogram(histogram, histo_parti);
+        if(USE_REFERENCE_BOX==true)
+            res += getDistanceHistogram(refHistogram, histo_parti);
+
         particules.at(i).setDistance(res);
 
         //add only if better score than the worst in particules, or if size of particules < NB_BEST_PARTICULES
