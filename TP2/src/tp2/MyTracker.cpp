@@ -18,14 +18,15 @@
 #define ANGLE_SIGNED true
 #define ANGLE_DIVISION 9 //should divide 360 if angle are signed or 180 if angle are unsigned
 
-
+//version myHOG
+#define CELL_SIZE 8
 
 enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA};
 
 DISTANCE_VERSION DV = CHI2; //choose which distance between histograms to use
 
-enum VERSION {BASELINE, HOG_OPENCV, HOG};
-VERSION V = HOG_OPENCV;
+enum VERSION {BASELINE, HOG_OPENCV, MY_HOG};
+VERSION V = MY_HOG;
 
 
 class Particule
@@ -174,6 +175,128 @@ std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
     return desc;
 }
 
+std::vector<float> getMyHOGDescriptor(const cv::Mat& frame_){
+    int ddepth = CV_16S;
+    int scale = 1;
+    int delta = 0;
+
+    cv::Mat frame = frame_.clone();
+    //convert to grayscale
+    cvtColor( frame_, frame, CV_BGR2GRAY );
+
+    cv::Mat grad_x, grad_y;
+    cv::Mat abs_grad_x, abs_grad_y;
+
+    // Gradient X
+    cv::Sobel( frame, grad_x, ddepth, 1, 0, 1, scale, delta, cv::BORDER_DEFAULT );
+    cv::convertScaleAbs( grad_x, abs_grad_x );
+
+    // Gradient Y
+    cv::Sobel( frame, grad_y, ddepth, 0, 1, 1, scale, delta, cv::BORDER_DEFAULT );
+    cv::convertScaleAbs( grad_y, abs_grad_y );
+
+    // Sum gradient X and Y
+    cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, frame);
+
+    cv::Mat directions(frame.clone());
+    for(int i = 0; i < frame.rows; ++i){
+        for(int j = 0; j < frame.cols; ++j){
+            //compute the angle
+            float angle = atan2((float)grad_y.at<int16_t>(i,j), (float)grad_x.at<int16_t>(i,j)) * 180 / PI;
+            //to get gradient direction between 0-180
+            if(angle<0)
+                angle = 180 + angle;
+            directions.at<uint8_t>(i,j) = angle;
+        }
+    }
+
+    //max number of cell (in width and in height) in the box
+    int nb_cell_width = frame_.size().width / CELL_SIZE;
+    int nb_cell_height = frame_.size().height / CELL_SIZE;
+
+    //matrix with cell histogramm
+    std::vector<std::vector<std::vector<float>>> matHisto;
+
+    //bins angles
+    std::vector<int> bins = {10,30,50,70,90,110,130,150,170};
+    //iterate over each cell
+    for(int i = 0; i < nb_cell_height; ++i)
+    {
+        //vector of cell histogram for one row
+        std::vector<std::vector<float>> tmp;
+
+        for(int j = 0; j < nb_cell_width; ++j)
+        {
+            //get cell gradient direction and magnitude
+            cv::Mat cellMag(frame, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+            cv::Mat cellDir(directions, cv::Rect(j*CELL_SIZE, i*CELL_SIZE, CELL_SIZE, CELL_SIZE));
+
+            //create the cell histogram
+            std::vector<float> histoCell(9, 0);
+
+            //iterate over pixels in a cell
+            for(int x = 0; x < 8; ++x)
+            {
+                for(int y = 0; y < 8; ++y)
+                {
+                    double value = cellDir.at<uint8_t>(x,y);
+
+                    //find the correct bin (go through bins and stop when value is smaller)
+                    int idx = -1;
+                    for(int a = 0; a < bins.size(); ++a)
+                    {
+                        if(value <= bins.at(a)){
+                            idx = a;
+                            break;
+                        }
+                    }
+
+
+                    // update histogram : two bins are increased if the angle is between
+                    //special case : only on bin
+                    if(idx == 0){
+                        histoCell.at(idx) += cellMag.at<uint8_t>(x,y);
+                    } else if(idx == -1)
+                    {
+                        histoCell.at(histoCell.size()-1) += cellMag.at<uint8_t>(x,y);
+                    }
+                    else{
+                        histoCell.at(idx) += cellMag.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx)))/20;
+                        histoCell.at(idx-1) += cellMag.at<uint8_t>(x,y)*(20-abs(value-bins.at(idx-1)))/20;
+                    }
+                }
+            }
+            tmp.push_back(histoCell);
+        }
+        matHisto.push_back(tmp);
+    }
+
+
+    std::vector<float> finalRes;
+
+    //iterate over blocks (1 block = 2x2 cells)
+    for(int i = 0; i < nb_cell_height-1; ++i)
+    {
+        for(int j = 0; j < nb_cell_width - 1; ++j)
+        {
+            //concatenate 4 histograms
+            std::vector<float> res = matHisto.at(i).at(j);
+            res.insert(res.end(), matHisto.at(i).at(j+1).begin(), matHisto.at(i).at(j+1).end());
+            res.insert(res.end(), matHisto.at(i+1).at(j).begin(), matHisto.at(i+1).at(j).end());
+            res.insert(res.end(), matHisto.at(i+1).at(j+1).begin(), matHisto.at(i+1).at(j+1).end());
+
+            double norm = 0;
+            //compute normalisation
+            for(int k = 0; k < res.size(); ++k)
+                norm += pow(res.at(i),2) + 0.5*0.5;
+
+            for(int k = 0; k < res.size(); ++k)
+                res.at(k) /= sqrt(norm);
+            finalRes.insert(finalRes.end(), res.begin(), res.end());
+        }
+    }
+    return finalRes;
+}
 
 std::vector<float> getHistogram(const cv::Mat& frame_){
     switch (V) {
@@ -181,8 +304,8 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
         return getBaselineHistogram(frame_);
     case HOG_OPENCV:
         return getHOGDescriptor(frame_);
-    case HOG:
-        return getHOGDescriptor(frame_);
+    case MY_HOG:
+        return getMyHOGDescriptor(frame_);
     }
 }
 
