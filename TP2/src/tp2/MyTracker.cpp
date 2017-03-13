@@ -10,26 +10,24 @@
 #define PI 3.14159265
 #define NB_PARTICULES 100
 
-#define FACTOR_CHANGE_PARTICULE_POSITION 1
-#define FACTOR_CHANGE_PARTICULE_SIZE 10
-#define NB_BEST_PARTICULES_BOX 3 //number of best particules to compute new box coordinate
-#define NB_BEST_PARTICULES_PART 3 //number of best particules to compute new box coordinate
+#define FACTOR_CHANGE_PARTICULE_POSITION 0.5
+#define FACTOR_CHANGE_PARTICULE_SIZE 100 //only used in Baseline
+#define NB_BEST_PARTICULES_BOX 4 //number of best particules to compute new box coordinate
+#define NB_BEST_PARTICULES_PART 10 //number of best particules to compute new box coordinate
 
 //version baseline
 #define ANGLE_SIGNED true
-#define ANGLE_DIVISION 9 //should divide 360 if angle are signed or 180 if angle are unsigned
+#define ANGLE_DIVISION 15 //should divide 360 if angle are signed or 180 if angle are unsigned
 
 //version myHOG
 #define CELL_SIZE 8
 
-#define USE_REFERENCE_BOX false
-
-
+#define USE_REFERENCE_BOX true
 enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA}; //BHATTACHARYYA doesn't work if histogram have difference size (HOG_OPENCV, _MY_HOG)
-DISTANCE_VERSION DV = CHI2; //choose which distance between histograms to use
+DISTANCE_VERSION DV = BHATTACHARYYA; //choose which distance between histograms to use
 
 enum VERSION {BASELINE, HOG_OPENCV, MY_HOG};
-VERSION V = HOG_OPENCV;
+VERSION V = MY_HOG;
 
 
 class Particule
@@ -361,11 +359,6 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
     {
         regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/FACTOR_CHANGE_PARTICULE_SIZE)*dis(gen))));
         regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/FACTOR_CHANGE_PARTICULE_SIZE)*dis(gen))));
-    }
-    if(regionSizeW < initSizeBox.width && regionSizeH < initSizeBox.height)
-    {
-        regionSizeH = particule.size().height;
-        regionSizeW = particule.size().width;
     }
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));

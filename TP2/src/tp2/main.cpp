@@ -1,7 +1,7 @@
 #include "tp2/common.hpp"
 #include <unistd.h>
 
-#define NB_FRAME_BEFORE_DECROCHAGE 10
+#define NB_FRAME_BEFORE_DECROCHAGE 10 //number of frames with OR = 0  accepted before decrochage
 
 float computeCLE(const cv::Rect& ref, cv::Rect& myRect)
 {
@@ -48,7 +48,7 @@ int main(int /*argc*/, char** /*argv*/) {
         const std::string sBaseDataPath(DATA_ROOT_PATH "/tp2/");
         const std::vector<std::string> vsSequenceNames = {"dog","face","woman"};
         const std::vector<size_t> vnSequenceSizes = {988,892,597};
-        for(size_t nSeqIdx=0; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
+        for(size_t nSeqIdx=1; nSeqIdx<vsSequenceNames.size(); ++nSeqIdx) {
             std::cout << "\nProcessing sequence '" << vsSequenceNames[nSeqIdx] << "'..." << std::endl;
             const std::string sInitFramePath = sBaseDataPath+vsSequenceNames[nSeqIdx]+"/img/0001.jpg";
             const cv::Mat oInitFrame = cv::imread(sInitFramePath);
@@ -62,7 +62,7 @@ int main(int /*argc*/, char** /*argv*/) {
             const cv::Rect oInitBBox = convertToRect(sCurrGTLine);
             std::cout << "Parsing input bounding box... done --- " << oInitBBox << std::endl;
 
-            int nbFrames = 0;
+            int nbFrames = 0, nbFrameOK = 0;
             double meanCLE = 0, meanOR = 0;
             int decrochage = 0;
             int nb_frame_decroche = 0;
@@ -93,6 +93,7 @@ int main(int /*argc*/, char** /*argv*/) {
                         meanOR += tmp;
                         meanCLE += computeCLE(oGTBBox, oOutputBBox);
                         nb_frame_decroche = 0; //reset
+                        ++nbFrameOK;
                     } else {
                         nb_frame_decroche++;
                         if(nb_frame_decroche == NB_FRAME_BEFORE_DECROCHAGE)
@@ -108,8 +109,9 @@ int main(int /*argc*/, char** /*argv*/) {
 //                cv::waitKey(0);
 
             }
-            std::cout << "Mean CLE : " << meanCLE / decrochage << std::endl;
-            std::cout << "Mean OR : " << meanOR / decrochage << std::endl;
+            if(decrochage == 0) decrochage = nbFrames; //no decrochage
+            std::cout << "Mean CLE : " << meanCLE / nbFrameOK << std::endl;
+            std::cout << "Mean OR : " << meanOR / nbFrameOK << std::endl;
             std::cout << "Suivi Algo : " << decrochage << "/" << nbFrames << std::endl;
             // @@@@ TODO : compute average CLE/OR measure for current sequence here
 
