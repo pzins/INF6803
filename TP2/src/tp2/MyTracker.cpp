@@ -86,7 +86,7 @@ std::shared_ptr<Tracker> Tracker::createInstance(){
 }
 
 
-std::vector<float> getHistogram(const cv::Mat& frame_){
+std::vector<float> getBaselineHistogram(const cv::Mat& frame_){
     int ddepth = CV_16S;
     int scale = 1;
     int delta = 0;
@@ -147,6 +147,10 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
         res.push_back(tmp);
     }
     return res;
+}
+
+std::vector<float> getHistogram(const cv::Mat& frame_){
+    return getBaselineHistogram(frame_);
 }
 
 
