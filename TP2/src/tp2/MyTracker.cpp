@@ -15,7 +15,7 @@
 
 enum DISTANCE_VERSION {DISTANCE_1, L2, BHATTACHARYYA_OPENCV, BHATTACHARYYA_COURS};
 
-DISTANCE_VERSION DV = BHATTACHARYYA_COURS; //choose which distance between histograms to use
+DISTANCE_VERSION DV = DISTANCE_1; //choose which distance between histograms to use
 
 
 
@@ -195,8 +195,8 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
     double y = particule.y+ round(particule.height*dis(gen));
 
     //size
-    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + round((particule.width/10)*dis(gen))));
-    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + round((particule.height/10)*dis(gen))));
+    double regionSizeW = std::max(1.0, std::min((double)oCurrFrame.size().width, particule.width + 0*round((particule.width/10)*dis(gen))));
+    double regionSizeH = std::max(1.0, std::min((double)oCurrFrame.size().height, particule.height + 0*round((particule.height/10)*dis(gen))));
 
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
