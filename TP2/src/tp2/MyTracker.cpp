@@ -10,9 +10,9 @@
 #define PI 3.14159265
 #define NB_PARTICULES 100
 
-#define FACTOR_CHANGE_PARTICULE_POSITION 0.5
-#define FACTOR_CHANGE_PARTICULE_SIZE 100 //only used in Baseline
-#define NB_BEST_PARTICULES_BOX 4 //number of best particules to compute new box coordinate
+#define FACTOR_CHANGE_PARTICULE_POSITION 1
+#define FACTOR_CHANGE_PARTICULE_SIZE 10 //only used in Baseline
+#define NB_BEST_PARTICULES_BOX 2 //number of best particules to compute new box coordinate
 #define NB_BEST_PARTICULES_PART 10 //number of best particules to compute new box coordinate
 
 //version baseline
@@ -27,7 +27,7 @@ enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA}; //BHATTACHARYYA doesn't work if
 DISTANCE_VERSION DV = BHATTACHARYYA; //choose which distance between histograms to use
 
 enum VERSION {BASELINE, HOG_OPENCV, MY_HOG};
-VERSION V = MY_HOG;
+VERSION V = BASELINE;
 
 
 class Particule
