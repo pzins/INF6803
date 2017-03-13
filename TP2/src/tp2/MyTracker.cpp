@@ -9,16 +9,23 @@
 
 #define PI 3.14159265
 #define NB_PARTICULES 100
-#define ANGLE_SIGNED true
-#define ANGLE_DIVISION 9 //should divide 360 if angle are signed or 180 if angle are unsigned
+
+#define RANDOM_RANGE 0.5 //range for x,y to compute particule
 #define NB_BEST_PARTICULES_BOX 3 //number of best particules to compute new box coordinate
 #define NB_BEST_PARTICULES_PART 3 //number of best particules to compute new box coordinate
-#define RANDOM_RANGE 0.5
+
+//version baseline
+#define ANGLE_SIGNED true
+#define ANGLE_DIVISION 9 //should divide 360 if angle are signed or 180 if angle are unsigned
+
+
 
 enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA};
 
 DISTANCE_VERSION DV = CHI2; //choose which distance between histograms to use
 
+enum VERSION {BASELINE, HOG_OPENCV, HOG};
+VERSION V = HOG_OPENCV;
 
 
 class Particule
@@ -149,8 +156,34 @@ std::vector<float> getBaselineHistogram(const cv::Mat& frame_){
     return res;
 }
 
+void correctRect(cv::Rect& rec){
+    int correction = 8;
+    if(rec.width % correction != 0){
+        rec.width -= rec.width % correction;
+    }
+    if(rec.height % correction != 0){
+        rec.height -= rec.height % correction;
+    }
+}
+
+
+std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
+    cv::HOGDescriptor d(frame_.size(), cv::Size(16,16), cv::Size(8,8), cv::Size(8,8),9);
+    std::vector<float> desc;
+    d.compute(frame_.clone(), desc);
+    return desc;
+}
+
+
 std::vector<float> getHistogram(const cv::Mat& frame_){
-    return getBaselineHistogram(frame_);
+    switch (V) {
+    case BASELINE:
+        return getBaselineHistogram(frame_);
+    case HOG_OPENCV:
+        return getHOGDescriptor(frame_);
+    case HOG:
+        return getHOGDescriptor(frame_);
+    }
 }
 
 
@@ -162,6 +195,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
         double res = 0;
         for(int i = 0; i < refHist.size(); ++i)
         {
+            if(refHist.at(i) + currHist.at(i) == 0) continue; //if both histogram have 0, continue to the next index
             res += pow(refHist.at(i)-currHist.at(i),2) / (refHist.at(i) + currHist.at(i));
         }
         return res;
@@ -189,11 +223,13 @@ void MyTracker::initialize(const cv::Mat& oInitFrame, const cv::Rect& oInitBBox)
 {
     srand (time(NULL));
 
+
     //clear particules between videos
     particules.clear();
 
     //init myBox and the associated histogram
     myBox = oInitBBox;
+    if(V==HOG_OPENCV) correctRect(myBox);
     histogram = getHistogram(oInitFrame(myBox));
     refHistogram = getHistogram(oInitFrame(myBox));
 
@@ -224,13 +260,15 @@ void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
     //limit inside the box
     x = std::max(0.0, std::min(x, oCurrFrame.cols-regionSizeW));
     y = std::max(0.0, std::min(y, oCurrFrame.rows-regionSizeH));
-
-    particules.push_back(cv::Rect(x, y, regionSizeW, regionSizeH));
+    cv::Rect res(x, y, regionSizeW, regionSizeH);
+    if(V == HOG_OPENCV) correctRect(res);
+    particules.push_back(res);
 }
 
 
 void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
 {
+
     //set with only NB_BEST_PARTICULES particules
     std::set<Particule, mycompare> best_particules;
 
@@ -279,9 +317,8 @@ void MyTracker::apply(const cv::Mat &oCurrFrame, cv::Rect &oOutputBBox)
     }
     //mean
     myBox = cv::Rect(x_/NB_BEST_PARTICULES_BOX, y_/NB_BEST_PARTICULES_BOX, w_/NB_BEST_PARTICULES_BOX, h_/NB_BEST_PARTICULES_BOX);
+    if(V == HOG_OPENCV) correctRect(myBox);
     oOutputBBox = myBox;
-
-
 
     // update histogram
     histogram=getHistogram(oCurrFrame(myBox));
