@@ -13,7 +13,7 @@
 #define FACTOR_CHANGE_PARTICULE_POSITION 1
 #define FACTOR_CHANGE_PARTICULE_SIZE 10 //only used in Baseline
 #define NB_BEST_PARTICULES_BOX 2 //number of best particules to compute new box coordinate
-#define NB_BEST_PARTICULES_PART 10 //number of best particules to compute new box coordinate
+#define NB_BEST_PARTICULES_PART 10 //number of best particules to compute new particules
 
 //version baseline
 #define ANGLE_SIGNED true
@@ -23,9 +23,11 @@
 #define CELL_SIZE 8
 
 #define USE_REFERENCE_BOX true
+//choose which distance between histograms to use
 enum DISTANCE_VERSION {CHI2, L2, BHATTACHARYYA}; //BHATTACHARYYA doesn't work if histogram have difference size (HOG_OPENCV, _MY_HOG)
-DISTANCE_VERSION DV = BHATTACHARYYA; //choose which distance between histograms to use
+DISTANCE_VERSION DV = BHATTACHARYYA;
 
+//choose version of tracking
 enum VERSION {BASELINE, HOG_OPENCV, MY_HOG};
 VERSION V = BASELINE;
 
@@ -33,7 +35,7 @@ VERSION V = BASELINE;
 class Particule
 {
 private:
-    double distance; //distance with suivi baseline
+    double distance;
     cv::Rect shape;
 
 public:
@@ -58,6 +60,8 @@ struct mycompare {
         return p1.getDistance() < p2.getDistance();
     }
 };
+
+//for debug
 std::ostream& operator<<(std::ostream& os, Particule& obj)
 {
     os << obj.getShape();
@@ -69,8 +73,8 @@ std::ostream& operator<<(std::ostream& os, Particule& obj)
 class MyTracker : public Tracker
 {
 private:
-    std::vector<float> histogram; //histogram suivi baseline
-    std::vector<float> refHistogram;
+    std::vector<float> histogram; //current box histogram
+    std::vector<float> refHistogram; //reference histogram of the first box
 
     cv::Rect myBox;
     std::vector<Particule> particules;
@@ -83,6 +87,7 @@ public:
     void printParticules();
 };
 
+//for debug
 void MyTracker::printParticules(){
     std::cout << "----------------------------------" << std::endl;
     for(auto i : particules)
@@ -96,6 +101,7 @@ std::shared_ptr<Tracker> Tracker::createInstance(){
 }
 
 
+//get histogram for the baseline version of tracking
 std::vector<float> getBaselineHistogram(const cv::Mat& frame_){
     int ddepth = CV_16S;
     int scale = 1;
@@ -159,6 +165,8 @@ std::vector<float> getBaselineHistogram(const cv::Mat& frame_){
     return res;
 }
 
+
+//to adjust Rect to width and height divisble by 8 (only used in HOG of OpenCV version)
 void correctRect(cv::Rect& rec){
     int correction = 8;
     if(rec.width % correction != 0){
@@ -170,6 +178,7 @@ void correctRect(cv::Rect& rec){
 }
 
 
+//get the histogram (descriptor) for the HOG of OpenCV tracking version
 std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
     cv::HOGDescriptor d(frame_.size(), cv::Size(16,16), cv::Size(8,8), cv::Size(8,8),9);
     std::vector<float> desc;
@@ -177,6 +186,7 @@ std::vector<float> getHOGDescriptor(const cv::Mat& frame_){
     return desc;
 }
 
+//get the histogram (descriptor) for our version of HOG tracking version
 std::vector<float> getMyHOGDescriptor(const cv::Mat& frame_){
     int ddepth = CV_16S;
     int scale = 1;
@@ -298,6 +308,7 @@ std::vector<float> getMyHOGDescriptor(const cv::Mat& frame_){
     return finalRes;
 }
 
+//get histogram accroding to the version of tracking
 std::vector<float> getHistogram(const cv::Mat& frame_){
     switch (V) {
     case BASELINE:
@@ -309,7 +320,7 @@ std::vector<float> getHistogram(const cv::Mat& frame_){
     }
 }
 
-
+//compute the distance between 2 histograms
 float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<float>& currHist)
 {
     if(DV == CHI2)
@@ -341,6 +352,7 @@ float getDistanceHistogram(const std::vector<float>& refHist, const std::vector<
     }
 }
 
+//compute and add a new particule to the model
 void MyTracker::addParticule(const cv::Mat& oCurrFrame, cv::Rect particule)
 {
     std::random_device rd;
