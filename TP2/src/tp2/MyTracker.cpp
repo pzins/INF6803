@@ -11,7 +11,7 @@
 #define NB_PARTICULES 100
 
 #define FACTOR_CHANGE_PARTICULE_POSITION 1
-#define FACTOR_CHANGE_PARTICULE_SIZE 10 //only used in Baseline
+#define FACTOR_CHANGE_PARTICULE_SIZE 25 //only used in Baseline
 #define NB_BEST_PARTICULES_BOX 2 //number of best particules to compute new box coordinate
 #define NB_BEST_PARTICULES_PART 10 //number of best particules to compute new particules
 
