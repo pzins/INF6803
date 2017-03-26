@@ -14,7 +14,8 @@ if(WIN32)
     list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/external/opencv")
 endif()
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE INTERNAL "")
-set(DATA_ROOT_PATH "${CMAKE_SOURCE_DIR}/data" CACHE INTERNAL "")
+#set(DATA_ROOT_PATH "${CMAKE_SOURCE_DIR}/data" CACHE INTERNAL "")
+
 
 ########################
 ## solution config below
@@ -61,9 +62,9 @@ configure_file(
     "${CMAKE_SOURCE_DIR}/include/tp2/common.hpp.conf"
     "${CMAKE_BINARY_DIR}/include/tp2/common.hpp"
 )
-add_executable(tp2_main
-    "src/tp2/main.cpp"
-    "src/tp2/MyTracker.cpp"
-    "include/tp2/common.hpp"
-)
-target_link_libraries(tp2_main ${OpenCV_LIBRARIES})
+    add_executable(tp2_main
+        "src/tp2/main.cpp"
+        "src/tp2/MyTracker.cpp"
+        "include/tp2/common.hpp"
+    )
+    target_link_libraries(tp2_main ${OpenCV_LIBRARIES})
