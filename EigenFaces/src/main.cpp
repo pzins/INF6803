@@ -26,15 +26,19 @@ private:
     int numPerson;
     int numImage;
     std::vector<double> wi;
+    cv::Mat phi;
+    int nbImg;
 public:
-    Face(const std::string& _name, cv::Mat& _data, int _numPerson, int _numImage) :
-        name(_name), data(_data), numPerson(_numPerson), numImage(_numImage){wi.assign(K, 0);}
+    Face(const std::string& _name, cv::Mat& _data, int _numPerson, int _numImage, int _nbImg) :
+        name(_name), data(_data), numPerson(_numPerson), numImage(_numImage), nbImg(_nbImg) {wi.assign(K, 0);}
     int getNumPerson() const {return numPerson;}
     int getNumImage() const {return numImage;}
+    int getNbImage() const {return nbImg;}
     cv::Mat& getData(){return data;}
     std::vector<double>& getWi(){return wi;}
     const std::string getName() const {return name;}
     void setWi(int i, double v){wi.at(i) = v;}
+    void setPhi(cv::Mat& _phi){phi = _phi;}
 };
 
 
@@ -68,7 +72,7 @@ void loadData(std::vector<Face>& faces){
             cv::Mat img = cv::imread(s.str(), cv::IMREAD_GRAYSCALE);
             img.convertTo(img, CV_64F);
             int index = (i-1) * NB_IMG_PER_PERSON + j - 1;
-            Face f(ss.str(), img, i, j);
+            Face f(ss.str(), img, i, j, counter);
             faces.push_back(f);
         }
     }
@@ -94,7 +98,6 @@ int main()
     {
         std::stringstream ss;
         ss << TEST_DATA_PATH << i << ".pgm";
-        std::cout << ss.str() << std::endl;
         cv::Mat image = cv::imread(ss.str(), cv::IMREAD_GRAYSCALE);
         image.convertTo(image, CV_64F);
         cv::subtract(image, avgImg, image);
@@ -106,15 +109,15 @@ int main()
         computeOmega(image, omega, eigenVectors);
 
         //identification
-        int res = identify(faces, omega);
+        int res = identify(faces, omega); //res = person index
         if(res == -1)
         {
             std::cout << "Ce visage est inconnu" << std::endl;
         }
         else
         {
-            std::cout << "Visage " << i << " : " << faces.at(res).getName() << std::endl;
-            if(i == faces.at(res).getNumPerson() ) score++;
+            std::cout << "Visage " << i << " : " << res << std::endl;
+            if(i == res) score++;
         }
     }
     std::cout << "=============================" << std::endl;
@@ -129,9 +132,18 @@ int identify(std::vector<Face> &faces, std::vector<double>& omega)
 {
     //check if the face is known and who it is
     double best_dist = std::numeric_limits<int>::max(), best_idx = -1;
+    std::vector<std::vector<double>> omegas(NB_PERSONS, std::vector<double>(K, 0));
     for(int i = 0; i < faces.size(); ++i)
     {
-        double res = dist(omega, faces.at(i).getWi());
+        for(int k = 0; k < K; ++k)
+            omegas.at(faces.at(i).getNumPerson()-1).at(k) += faces.at(i).getWi().at(k);
+        for(int k = 0; k < K; ++k)
+            omegas.at(faces.at(i).getNumPerson()-1).at(k) /= faces.at(i).getNbImage();
+
+    }
+    for(int i = 0; i < omegas.size(); ++i)
+    {
+        double res = dist(omega, omegas.at(i));
 //        std::cout << res << " -> " << i << std::endl;
         if(res < best_dist){
             best_dist = res;
@@ -251,6 +263,7 @@ void EigenFaces(cv::Mat& eigenVector, cv::Mat& avgImg, std::vector<Face>& faces)
     //compute wi for all training set images
     for(int i = 0; i < faces.size(); ++i)
     {
+        cv::Mat phi(IMG_H*IMG_W, 1, CV_64F);
         for(int k = 0; k < K; ++k)
         {
             cv::Mat ui = eigenVector.col(k);
@@ -258,9 +271,10 @@ void EigenFaces(cv::Mat& eigenVector, cv::Mat& avgImg, std::vector<Face>& faces)
             cv::transpose(ui,ui);
             faces.at(i).getData().convertTo(faces.at(i).getData(), CV_64F);
             cv::Mat wi =  ui*faces.at(i).getData();
-            std::cout << k << " " << faces.at(i).getWi().size() << std::endl;
             faces.at(i).setWi(k, wi.at<double>(0,0));
+            phi += wi.at<double>(0, 0) * eigenVector.col(k);
         }
+        faces.at(i).setPhi(phi);
     }
 
 }
