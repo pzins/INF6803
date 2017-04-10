@@ -122,9 +122,12 @@ void loadData(cv::Mat& images, cv::Mat &avgImg){
 
 std::vector<std::tuple<int, float> > identify(cv::Mat& weightsTrain, cv::Mat& wis)
 {
+
     std::vector<std::tuple<int,float>> results;
+    //loop over test images
     for(int i = 0; i < wis.cols; ++i)
     {
+        //loop over train images
         double best_dist = std::numeric_limits<int>::max(), best_idx = -1;
         for(int j = 0; j < weightsTrain.cols; ++j)
         {
@@ -215,7 +218,6 @@ cv::Mat train(cv::Mat &images, cv::Mat& eigenVectors, cv::Mat& avgImg)
     } while(num / deno <= THRESHOLD_K);
     K++;
 //    K = eVe.cols;
-    std::cout << K << std::endl;
     //init eigenVector, because now we know its size
     eigenVectors.create(IMG_H*IMG_W, K, CV_64F);
 
@@ -240,7 +242,7 @@ cv::Mat train(cv::Mat &images, cv::Mat& eigenVectors, cv::Mat& avgImg)
 
     cv::Mat wis(K,images.cols, CV_64F, cv::Scalar(0));
     wis = eigenVectors.t() * images;
-
+//    std::cout << wis << std::endl;
 
     for(int im = 0;  im < images.cols; ++im)
     {
@@ -271,7 +273,7 @@ double dist(const cv::Mat &matA, const cv::Mat &matB)
 {
     cv::Mat t = matA - matB, res;
     cv::sqrt(t.mul(t), res);
-    return res.at<double>(0,0) / matA.rows;
+    return cv::sum(res)[0]/matA.rows;
 }
 
 
