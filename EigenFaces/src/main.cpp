@@ -9,17 +9,21 @@
 #include <fstream>
 #include "common.hpp"
 
-#define NB_TEST_IMG 40
+#define NB_TEST_IMG 48
+#define NB_KNOWN_TEST_IMG 40
 #define NB_PERSONS 40
+#define NB_IMAGES_PER_PERSON 9
+#define NB_IMAGES NB_PERSONS * NB_IMAGES_PER_PERSON
 
 #define IMG_W 92
 #define IMG_H 112
 
 #define DISTANCE_FACE_THRESHOLD 400
-#define DISTANCE_SPACE_THRESHOLD 0.1
-#define SHOW_EIGENFACE false //No to activate if K is high
+#define DISTANCE_SPACE_THRESHOLD 0.42
+#define SHOW_EIGENFACE true //No to activate if K is high
 #define ALL_TRAINING_IMG true
-#define THRESHOLD_K 0.95
+#define THRESHOLD_K 1
+
 
 //class representing a Face
 class Face{
@@ -46,13 +50,11 @@ public:
 
 
 //declaration of functions
-double dist(const std::vector<double>& currImgWi, const std::vector<double>& datasetImgWi);
 double dist(const cv::Mat& matA, const cv::Mat& matB);
-void train(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg);
-void test(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat &avgImg);
-void computeOmegaPhi(cv::Mat& image, cv::Mat& eigenVectors, std::vector<double>& omega, cv::Mat& phi);
-int identify(std::vector<Face>& faces, std::vector<double>& omega, cv::Mat &phi, int testImage);
-void loadData(std::vector<Face> &faces, cv::Mat& avgImg);
+cv::Mat train(cv::Mat& images, cv::Mat& eigenVectors, cv::Mat& avgImg);
+void test(cv::Mat weightsTrain, cv::Mat& eigenVectors, cv::Mat &avgImg);
+std::vector<std::tuple<int, float> > identify(cv::Mat &weightsTrain, cv::Mat &wis);
+void loadData(cv::Mat &images, cv::Mat& avgImg);
 
 
 
@@ -63,137 +65,88 @@ int main()
     //load data into faces
     std::vector<Face> faces;
     cv::Mat avgImg(IMG_H, IMG_W, CV_64F, cv::Scalar(0));
-    loadData(faces, avgImg);
+    cv::Mat images(IMG_H*IMG_W, NB_IMAGES, CV_64F);
+    loadData(images, avgImg);
 
     cv::Mat eigenVectors;
+    cv::Mat weightsTrain;
     //train the model
-    train(faces, eigenVectors, avgImg);
+    weightsTrain = train(images, eigenVectors, avgImg);
 
     //test with new images
-    test(faces, eigenVectors, avgImg);
+    test(weightsTrain, eigenVectors, avgImg);
     return 0;
 }
 
+
+//display image stored in vector (eigenface, image projection in face space)
+void displayImgVec(const cv::Mat& img, int index){
+    /*
+    cv::Mat tmp;
+    img.copyTo(tmp);
+    tmp = tmp.reshape(0,IMG_H);
+
+    //normalize between 0 and 1
+    double mi, ma;
+    cv::minMaxLoc(tmp, &mi, &ma);
+    tmp += fabs(mi);
+    tmp /= fabs(ma)+fabs(mi);
+*/
+    //display
+    std::stringstream ss;
+    ss << "Window_" << index;
+    cv::namedWindow(ss.str());
+    cv::imshow(ss.str(), img);
+}
+
+
 //load training data in faces, and compute the mean of all the images
-void loadData(std::vector<Face>& faces, cv::Mat &avgImg){
+void loadData(cv::Mat& images, cv::Mat &avgImg){
     for(int i = 1; i <= NB_PERSONS; ++i)
     {
-        //count how many faces for each person
-        int counter = 0;
-        while(1){
-            std::stringstream ss;
-            ss << TRAINING_DATA_PATH << i << "_" << ++counter <<".pgm";
-            std::ifstream iff(ss.str());
-            //test if file exists
-            if(!iff){
-                counter--;
-                break;
-            }
-        }
         //load each face in the vector
-        for(int j = 1; j <= counter; ++j)
+        for(int j = 1; j <= NB_IMAGES_PER_PERSON; ++j)
         {
             std::stringstream ss, s;
             ss << i << "_" << j <<".pgm";
             s << TRAINING_DATA_PATH << ss.str();
             cv::Mat img = cv::imread(s.str(), cv::IMREAD_GRAYSCALE);
             img.convertTo(img, CV_64F);
-            cv::accumulate(img, avgImg); //accumulate images to compute the mean
-
-            Face f(ss.str(), img, i, j, counter);
-            faces.push_back(f);
-
+            avgImg += img;
+            img.reshape(0, IMG_H*IMG_W).copyTo(images.col((i-1)*NB_IMAGES_PER_PERSON + j-1));
         }
     }
     //compue the mean
-    avgImg /= faces.size();
+    avgImg /= NB_IMAGES;
 }
 
-//check if the face is recognized, or if it is unknow or if it's not a face
-//return 0 : if the new image is unknow or if it's not a face
-//return 1:  if the new image has been recognized
-int identify(std::vector<Face> &faces, std::vector<double>& omega, cv::Mat& phi, int testImage)
+std::vector<std::tuple<int, float> > identify(cv::Mat& weightsTrain, cv::Mat& wis)
 {
-    double best_dist = std::numeric_limits<int>::max(), best_idx = -1;
-    //we consider 1 omega for 1 person in the training set (mean of wi of all image of the same person)
-    if(!ALL_TRAINING_IMG)
+    std::vector<std::tuple<int,float>> results;
+    for(int i = 0; i < wis.cols; ++i)
     {
-        int K = faces.at(0).getWi().size();
-        //compute wi mean for each person in training set
-        std::vector<std::vector<double>> omegas(NB_PERSONS, std::vector<double>(K, 0));
-        for(int i = 0; i < faces.size(); ++i)
+        double best_dist = std::numeric_limits<int>::max(), best_idx = -1;
+        for(int j = 0; j < weightsTrain.cols; ++j)
         {
-            //sum all wi for each person
-            for(int k = 0; k < K; ++k)
-                omegas.at(faces.at(i).getNumPerson()-1).at(k) += faces.at(i).getWi().at(k);
-            //divide by the number of image for each person
-            for(int k = 0; k < K; ++k)
-                omegas.at(faces.at(i).getNumPerson()-1).at(k) /= faces.at(i).getNbImage();
-        }
-        //look for the smallest distance between each person in the training set and the new image
-        for(int i = 0; i < omegas.size(); ++i)
-        {
-            double res = dist(omega, omegas.at(i));
+            double res = dist(wis.col(i), weightsTrain.col(j));
             if(res < best_dist){
                 best_dist = res;
-                best_idx = i;
+                best_idx = j;
             }
         }
+        results.push_back(std::make_tuple(int(best_idx/9), best_dist));
     }
-    //we consider n images for 1 person
-    else {
-        //look for the shortest distance between each training image (several images for one same person) and hte new image
-        for(int i = 0; i < faces.size(); ++i)
-        {
-            double res = dist(omega, faces.at(i).getWi());
-            if(res < best_dist){
-                best_dist = res;
-                best_idx = faces.at(i).getNumPerson();
-            }
-        }
-    }
-    //compute the difference between the image and its projection in the new space
-    double res = dist(faces.at(testImage).getData(), phi);
-
-    //if the image and its projection in the new space are too different
-    if(res > DISTANCE_SPACE_THRESHOLD){
-        std::cout << "Face " << testImage << " : this image is not a face " << best_dist << " " << res << std::endl;
-    }
-    //if image and its proejction are close but the face is unknown
-    else if(best_dist > DISTANCE_FACE_THRESHOLD)
-    {
-        std::cout << "Face " << testImage << " : this face is unknown " << best_dist << " " << res << std::endl;
-    }
-    //the face is recognized
-    else
-    {
-        std::cout << "Face " << testImage << " : " << best_idx  << "  " << best_dist << " " << res << std::endl;
-        if(testImage == best_idx) return 1;
-    }
-    return  0;
+    std::cout << results.size() << std::endl;
+    return results;
 }
 
-
-//compute the wi [w1, w2, ...] for the image and compute the projection of the image in the new space
-void computeOmegaPhi(cv::Mat &image, cv::Mat& eigenVectors, std::vector<double>& omega, cv::Mat& phi)
-{
-    for(int i = 0; i < eigenVectors.cols; ++i)
-    {
-        cv::Mat tmpT, wi;
-        cv::Mat tmp = eigenVectors.col(i);
-        cv::transpose(tmp,tmpT);
-        wi = tmpT * image;
-        omega.push_back(wi.at<double>(0,0));
-        cv::accumulate(wi.at<double>(0,0) * eigenVectors.col(i), phi);
-    }
-
-}
 
 //try to recognize test faces
-void test(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg)
+void test(cv::Mat weightsTrain, cv::Mat& eigenVectors, cv::Mat& avgImg)
 {
     //test with images
     float score = 0;
+    cv::Mat testImages(IMG_H*IMG_W, NB_TEST_IMG, CV_64F);
     //loop over the test images
     for(int i = 1; i <= NB_TEST_IMG; ++i)
     {
@@ -205,14 +158,18 @@ void test(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg)
         //subtract mean and reshape into vector
         cv::subtract(image, avgImg, image);
         image = image.reshape(0,IMG_H*IMG_W);
+        image.copyTo(testImages.col(i-1));
+    }
+    cv::Mat wis = eigenVectors.t() * testImages;
 
-        //compute omega [w1 w2 ... wK] and phi (the projection of the image in the new space) for the new image
-        std::vector<double> omega;
-        cv::Mat phi(IMG_H*IMG_W, 1, CV_64F, cv::Scalar(0));
-        computeOmegaPhi(image, eigenVectors, omega, phi);
+    //identification of the face
+    std::vector<std::tuple<int, float>> results = identify(weightsTrain, wis);
 
-        //identification of the face
-        score += identify(faces, omega, phi, i);
+    for(int i = 0; i < results.size(); ++i)
+    {
+        std::cout << "Image test person " << i << " => " << std::get<0>(results.at(i)) << "   (distance " << std::get<1>(results.at(i))<< ")" << std::endl;
+        if(i == std::get<0>(results.at(i)))
+            score++;
 
     }
     //show results
@@ -222,25 +179,27 @@ void test(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg)
 
 }
 
-void train(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg)
+cv::Mat train(cv::Mat &images, cv::Mat& eigenVectors, cv::Mat& avgImg)
 {
+    /*
+    cv::namedWindow("ol");
+    cv::normalize(avgImg, avgImg, 0, 1, cv::NORM_MINMAX);
+    cv::imshow("ol", avgImg);
+    cv::waitKey();
+    */
+
     //subtract the images mean, reshape images into vectors and store them in a matrix
-    cv::Mat matrix(IMG_H*IMG_W, faces.size(), CV_64F);
-    for(int i = 0; i < faces.size(); ++i)
-    {
-        cv::subtract(faces.at(i).getData(), avgImg, faces.at(i).getData());
-        faces.at(i).getData() = faces.at(i).getData().reshape(0,IMG_H*IMG_W);
-        faces.at(i).getData().col(0).copyTo(matrix.col(i));
-    }
+    for(int i = 0; i < images.cols; ++i)
+        images.col(i) -= avgImg.reshape(0, IMG_H*IMG_W);
+    cv::Mat matrix;
+    images.copyTo(matrix);
 
     //transpose matrix
-    cv::Mat matrixT;
-    cv::transpose(matrix, matrixT);
+    cv::Mat matrixT = matrix.t();
 
     //compute covariance matrix
     //matrixT * matrix instead of matrix * matrixT : to limit the dimensionnality
-    cv::Mat cov, mu;
-    cov = matrixT * matrix;
+    cv::Mat cov = (matrixT * matrix) / matrix.cols;
 
     //compute eigenvalues and eigenvectors of matrixT * matrix
     cv::Mat eVa, eVe;
@@ -254,46 +213,57 @@ void train(std::vector<Face>& faces, cv::Mat& eigenVectors, cv::Mat& avgImg)
     {
         num += eVa.at<double>(K++,0);
     } while(num / deno <= THRESHOLD_K);
+    K++;
+//    K = eVe.cols;
+    std::cout << K << std::endl;
     //init eigenVector, because now we know its size
     eigenVectors.create(IMG_H*IMG_W, K, CV_64F);
-    //compute real Eigenvector of matrix * matrixT
-    for(int i = 0; i < K; ++i){
-        eigenVectors.col(i) = matrix * eVe.col(i);
-        //normalization
-        cv::normalize(eigenVectors.col(i), eigenVectors.col(i),1);
 
-        //print Eigenfaces
-        if(SHOW_EIGENFACE) {
-            cv::Mat tmp(eigenVectors.rows,1,CV_64F);
-            eigenVectors.col(i).copyTo(tmp);
-            tmp = tmp.reshape(0,IMG_H);
-            //normalize between 0 and 1
-            double mi, ma;
-            cv::minMaxLoc(tmp, &mi, &ma);
-            tmp += fabs(mi);
-            tmp /= fabs(ma)+fabs(mi);
-            //display
-            std::stringstream ss;
-            ss << "EigenVector_" << i;
-            cv::namedWindow(ss.str());
-            cv::imshow(ss.str(), tmp);
-        }
+    eigenVectors = matrix * eVe;
+    //compute real Eigenvector of matrix * matrixT
+    for(int i = 0; i < eigenVectors.cols; ++i){
+//        cv::normalize(eigenVectors.col(i), eigenVectors.col(i),1,0,cv::NORM_L2,-1, cv::noArray());
+        cv::normalize(eigenVectors.col(i), eigenVectors.col(i),0,1,cv::NORM_MINMAX);
     }
 
+    /*
+    // print eigenfaces
+    for(int i = 0; i < 10; ++i){
+    cv::Mat tmp = eigenVectors.col(i).clone();
+    cv::normalize(tmp, tmp, 0, 1, cv::NORM_MINMAX);
+    tmp = tmp.reshape(0, IMG_H);
+    cv::namedWindow("l");
+    cv::imshow("l", tmp);
+    cv::waitKey();
+    }
+    */
 
-    //compute wi for all training set images
-    for(int i = 0; i < faces.size(); ++i)
+    cv::Mat wis(K,images.cols, CV_64F, cv::Scalar(0));
+    wis = eigenVectors.t() * images;
+
+
+    for(int im = 0;  im < images.cols; ++im)
     {
-        faces.at(i).initWi(K);
-        for(int k = 0; k < K; ++k)
-        {
-            cv::Mat ui = eigenVectors.col(k);
-            cv::transpose(ui,ui);
-            cv::Mat wi =  ui*faces.at(i).getData();
-            faces.at(i).setWi(k, wi.at<double>(0,0));
+        cv::Mat res(IMG_H*IMG_W, 1, CV_64F, cv::Scalar(0));
+        for(int l = 0; l < K; ++l){
+            cv::Mat tmp;
+            eigenVectors.col(l).copyTo(tmp);
+            res += wis.at<double>(l, im) * tmp;
         }
+        res = res.reshape(0, IMG_H);
+        cv::normalize(res, res, 0, 1, cv::NORM_MINMAX);
+
+        /*
+        cv::namedWindow("res");
+        cv::Mat t = images.col(im).clone();
+        cv::normalize(t,t,0,1, cv::NORM_MINMAX);
+//        cv::imshow("res", t.reshape(0, IMG_H));
+        cv::imshow("res", res);
+        cv::waitKey();
+        */
     }
     std::cout << "Training done" << std::endl;
+    return wis;
 }
 
 //compute euclidian distance between two cv::mat
@@ -304,11 +274,148 @@ double dist(const cv::Mat &matA, const cv::Mat &matB)
     return res.at<double>(0,0) / matA.rows;
 }
 
-//compute euclidian distance between two vectors
-double dist(const std::vector<double>& currImgWi, const std::vector<double>& datasetImgWi)
-{
-    double res = 0;
-    for(int i = 0; i < currImgWi.size(); ++i)
-        res += sqrt(pow(datasetImgWi.at(i) - currImgWi.at(i),2));
-    return res/currImgWi.size();
+
+
+
+
+
+
+
+
+/*
+using namespace cv;
+using namespace std;
+
+int taille=112*92;
+int nb_image = 40 * 9;
+string root = "/home/pierre/Dev/INF6803/EigenFaces/DATA/training/";
+string root_test = "/home/pierre/Dev/INF6803/EigenFaces/DATA/test/";
+double mini, maxi, Dist,energie,seuil=0;
+vector<float> resultats, eigenvalues;
+
+int main() {
+
+    // Déclaration Variable
+    namedWindow("mywindow");
+    namedWindow("mywindow2");
+
+    Mat img,D, Deigenvectors, base_connaissance, rebuild_data, rebuild_vector, rebuild_image, test,test_proj,comp;
+    Mat rec(nb_image,taille, CV_64F);
+
+    img.convertTo(img, CV_64F);
+    D.convertTo(D, CV_64F);
+    Deigenvectors.convertTo(Deigenvectors, CV_64F);
+    base_connaissance.convertTo(base_connaissance, CV_64F);
+    rebuild_data.convertTo(rebuild_data, CV_64F);
+    rebuild_vector.convertTo(rebuild_vector, CV_64F);
+    rebuild_image.convertTo(rebuild_image, CV_64F);
+    test_proj.convertTo(test_proj, CV_64F);
+    comp.convertTo(comp, CV_64F);
+
+
+
+
+    // Conversion en ton de gris + reshape
+    for (int i = 1; i < 41; i++) {
+        for (int j = 1; j < 10; j++) {
+            stringstream sstr;
+            sstr << root  << i << "_" << j << ".pgm";
+            string path = sstr.str();
+            img = imread(path,IMREAD_GRAYSCALE);
+            //imshow("mywindow", img_gray);
+            //waitKey(0);
+
+            img.reshape(0, 1).copyTo(rec.row((i - 1) * 9 + j - 1));
+        }
+    }
+
+
+    // Calcul mean et eigenvector
+    Scalar tempVal = mean(rec);
+    float mean_rec = tempVal.val[0];
+    Mat rec_mean(nb_image,taille, CV_64F, mean_rec);
+
+
+
+    rec = rec - rec_mean;
+    D = rec*rec.t() / nb_image;
+    eigen(D, eigenvalues, Deigenvectors);
+
+    energie = sum(eigenvalues)[0];
+
+    int i = 0;
+    while (seuil < 0.85*energie) {
+        seuil += eigenvalues.at(i);
+        i++;
+    }
+    i = rec.rows;
+    cout << "On a conserve " << i << " vecteurs propre" << endl;
+    Mat Ceigenvectors(nb_image, i, CV_64F);
+
+    for (int k = 0; k < i; k++) {
+        for (int j = 0; j < Deigenvectors.rows; j++) {
+            Ceigenvectors.at<float>(j, k) = Deigenvectors.at<float>(j, k);
+        }
+    }
+    for (int i = 0; i < Ceigenvectors.cols; i++) {
+        normalize(Ceigenvectors.col(i), Ceigenvectors.col(i), 1, 0, NORM_L2, -1, noArray());
+    }
+
+    std::cout << Ceigenvectors.size() << std::endl;
+    std::cout << rec.size() << std::endl;
+    // Création base de données
+
+    base_connaissance = Ceigenvectors.t()*rec;
+    std::cout << base_connaissance.size() << std::endl;
+    //base_connaissance = matrice avc chaque lg le vec propre refait (celui avc la bonne taille de N*N)
+    rebuild_data = Ceigenvectors*base_connaissance;
+
+    rebuild_data.row(nb_image-1).copyTo(rebuild_vector);
+    rebuild_vector.reshape(0, 112).copyTo(rebuild_image);
+
+    minMaxLoc(rebuild_image, &mini, &maxi);
+
+    rebuild_image = rebuild_image - mini;
+
+    minMaxLoc(rebuild_image, &mini, &maxi);
+
+    rebuild_image = rebuild_image / maxi;
+
+    imshow("mywindow", img);
+    imshow("mywindow2", rebuild_image);
+
+
+    cv::waitKey(0);
+
+    // TEST image dataset et conversion
+
+    stringstream sstr;
+    sstr << root_test << "1.pgm";
+    string path = sstr.str();
+    test = imread(path,IMREAD_GRAYSCALE);
+
+    Mat test_mean(112, 92, CV_64F, mean_rec);
+
+    test.convertTo(test, CV_64F);
+
+    test = test - test_mean;
+
+    // Projection et calcul distance
+
+    test_proj = test.reshape(0, 1)*base_connaissance.t();
+    comp = rec*base_connaissance.t();
+
+    for (int i = 0; i < Ceigenvectors.rows; i++) {
+        Dist = 0.0;
+        for (int j = 0; j < Ceigenvectors.cols; j++){
+            Dist += pow((test_proj.at<double>(0,j) - comp.at<double>(i,j)),2);
+        }
+        Dist = pow(Dist, 0.5);
+        resultats.push_back(Dist);
+    }
+    mini= min_element(resultats.begin(), resultats.end()) - resultats.begin();
+    cout << mini/9+1 << endl;
+    waitKey(0);
+    return 0;
 }
+*/
