@@ -9,9 +9,6 @@
 #include <fstream>
 #include "common.hpp"
 
-#define NB_TEST_IMG 48
-#define NB_KNOWN_TEST_IMG 40
-
 #define NB_PERSONS 40
 #define NB_IMAGES_PER_PERSON 9
 #define NB_IMAGES NB_PERSONS * NB_IMAGES_PER_PERSON
@@ -19,9 +16,19 @@
 #define IMG_W 92
 #define IMG_H 112
 
-#define DISTANCE_FACE_THRESHOLD 3e8
-#define DISTANCE_SPACE_THRESHOLD 8e8
+//number of test image
+#define NB_TEST_IMG 49
+//number of known face among the test set
+#define NB_KNOWN_TEST_IMG 40
+
+//two thresholds
+#define DISTANCE_FACE_THRESHOLD 3.4e8
+#define DISTANCE_SPACE_THRESHOLD 4e8
+
 #define THRESHOLD_K 0.95
+
+#define SHOW_RECONSTRUCTION false
+
 
 //declaration of functions
 cv::Mat train(cv::Mat& images, cv::Mat& wis, cv::Mat& avgImg);
@@ -31,6 +38,7 @@ double dist(const cv::Mat& matA, const cv::Mat& matB);
 
 int main()
 {
+
     cv::Mat avgImg(IMG_H, IMG_W, CV_64F, cv::Scalar(0));
     cv::Mat images(IMG_H*IMG_W, NB_IMAGES, CV_64F);
     cv::Mat wis;
@@ -43,6 +51,7 @@ int main()
     return 0;
 }
 
+//perform the training phase
 cv::Mat train(cv::Mat &images, cv::Mat& wis, cv::Mat& meanImage)
 {
     //load data
@@ -89,6 +98,7 @@ cv::Mat train(cv::Mat &images, cv::Mat& wis, cv::Mat& meanImage)
         num += eVa.at<double>(K++,0);
     } while(num / deno <= THRESHOLD_K);
     K++;
+    std::cout << "Nous conservons " << K << " vecteurs propres." << std::endl;
 
     // matrix with only K eigenvectors
     cv::Mat eigVec(eVe.rows, K, CV_64F);
@@ -102,6 +112,7 @@ cv::Mat train(cv::Mat &images, cv::Mat& wis, cv::Mat& meanImage)
     wis.create(IMG_H*IMG_W, K, CV_64F);
     wis = matrix * eigVec;
 
+    //reconstruct images
     cv::Mat rebuildImages = eigVec * wis.t();
     for(int im = 0;  im < images.cols; ++im)
     {
@@ -110,13 +121,13 @@ cv::Mat train(cv::Mat &images, cv::Mat& wis, cv::Mat& meanImage)
         reconstruction = reconstruction.reshape(0, IMG_H);
         reconstruction += meanImage;
         reconstruction /= 255;
-//to show reconstruction of the training images
-//        cv::namedWindow("res");
-//        cv::imshow("res", reconstruction);
-//        cv::waitKey();
-
+        //to show reconstruction of the training images
+        if(SHOW_RECONSTRUCTION){
+            cv::namedWindow("res");
+            cv::imshow("res", reconstruction);
+            cv::waitKey();
+        }
     }
-    std::cout << "Training done" << std::endl;
     return eigVec;
 }
 
@@ -148,19 +159,23 @@ void test(cv::Mat eigVect, cv::Mat& avgImg, cv::Mat matrix)
     std::vector<std::tuple<int, float>> results = identify(weightsTrain, weightsTest);
 
     //loop over test faces to show the identification result
-    for(int i = 0; i < results.size(); ++i)
+    for(int i = 1; i <= NB_TEST_IMG; ++i)
     {
-        double distance = std::get<1>(results.at(i));
-        int face = std::get<0>(results.at(i));
+        double distance = std::get<1>(results.at(i-1));
+        int face = std::get<0>(results.at(i-1));
         if(distance > DISTANCE_SPACE_THRESHOLD){
-            std::cout << "Image test person " << i << " => Not a face (distance " << std::get<1>(results.at(i))<< ")" << std::endl;
+            std::cout << "Image test person " << i << " => Not a face (distance " << distance << ")" << std::endl;
         } else if(distance > DISTANCE_FACE_THRESHOLD){
-            std::cout << "Image test person " << i << " => face is unknown (distance " << std::get<1>(results.at(i))<< ")" << std::endl;
+            std::cout << "Image test person " << i << " => face is unknown (distance " << distance << ")" << std::endl;
 
         } else {
-            std::cout << "Image test person " << i << " => " << std::get<0>(results.at(i)) << "   (distance " << std::get<1>(results.at(i))<< ")" << std::endl;
-            if(i == std::get<0>(results.at(i)))
+            std::cout << "Image test person " << i << " => " << face << "   (distance " << distance << ")";
+            if(i == face){
+                std::cout << std::endl;
                 score++;
+            } else {
+                std::cout << " Error" << std::endl;
+            }
         }
 
     }
@@ -190,9 +205,8 @@ std::vector<std::tuple<int, float> > identify(cv::Mat& weightsTrain, cv::Mat& we
                 best_idx = j;
             }
         }
-        results.push_back(std::make_tuple(int(best_idx/9), best_dist));
+        results.push_back(std::make_tuple(int(best_idx/9)+1, best_dist));
     }
-    std::cout << results.size() << std::endl;
     return results;
 }
 
